@@ -1,14 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, Pressable } from "react-native"
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, Pressable, Image } from "react-native"
 import Colors from "../../../constants/Colors"
-import { getPlayerData, fetchMatchHistory, formatMatchDate, getQueueName } from "../../../api/valorantService"
-
-// Mock data for visual details (agent, map, score) - real timestamps from API
-const MOCK_AGENT_MAP = ['Jett', 'Omen', 'Sova', 'Sage', 'Reyna', 'Killjoy', 'Breach', 'Raze', 'Phoenix', 'Viper'];
-const MOCK_MAP_LIST = ['Ascent', 'Bind', 'Haven', 'Split', 'Icebox', 'Lotus', 'Pearl'];
+import { getPlayerData, fetchMatchHistory, fetchMatchDetails, formatMatchDate, getQueueName } from "../../../api/valorantService"
+import { getAgents, getMaps } from "../../../api/mappingService"
 
 const MatchItem = ({ 
     agent, 
+    agentIcon,
     result, 
     score, 
     map, 
@@ -16,22 +14,27 @@ const MatchItem = ({
     queueName 
 }: { 
     agent: string; 
+    agentIcon?: string;
     result: string; 
     score: string; 
     map: string; 
     date: string;
     queueName: string;
 }) => (
-    <View style={[styles.matchItem, result === 'Victory' ? styles.victoryBorder : styles.defeatBorder]}>
+    <View style={[styles.matchItem, result === 'Victory' ? styles.victoryBorder : (result === 'Defeat' ? styles.defeatBorder : styles.drawBorder)]}>
         <View style={styles.matchMainInfo}>
-            <View style={styles.agentPlaceholder} />
+            {agentIcon ? (
+                <Image source={{ uri: agentIcon }} style={styles.agentIcon} />
+            ) : (
+                <View style={styles.agentPlaceholder} />
+            )}
             <View>
                 <Text style={styles.agentName}>{agent}</Text>
                 <Text style={styles.mapName}>{map} • {queueName}</Text>
             </View>
         </View>
         <View style={styles.matchStats}>
-            <Text style={[styles.resultText, result === 'Victory' ? styles.victoryText : styles.defeatText]}>
+            <Text style={[styles.resultText, result === 'Victory' ? styles.victoryText : (result === 'Defeat' ? styles.defeatText : styles.drawText)]}>
                 {result}
             </Text>
             <Text style={styles.scoreText}>{score}</Text>
@@ -63,28 +66,77 @@ const MatchesPage = () => {
             const historyData = await fetchMatchHistory(activeRegion, info.sub);
 
             if (historyData && historyData.History && historyData.History.length > 0) {
-                // Transform API match history to display format
-                const transformedMatches = historyData.History.map((match: any, index: number) => {
-                    // Use mock data for visual details, real data for timestamps and queue
-                    const agent = MOCK_AGENT_MAP[index % MOCK_AGENT_MAP.length];
-                    const map = MOCK_MAP_LIST[index % MOCK_MAP_LIST.length];
+                const agentsData = await getAgents();
+                const mapsData = await getMaps();
+                
+                const agentMap = new Map(agentsData.map((a: any) => [a.uuid.toLowerCase(), a]));
+                const mapMap = new Map(mapsData.map((m: any) => [m.mapUrl, m.displayName]));
+
+                // Take up to 10 matches to avoid long loading times and rate limits
+                const recentMatches = historyData.History.slice(0, 10);
+                
+                const transformedMatches = await Promise.all(recentMatches.map(async (match: any) => {
+                    const details = await fetchMatchDetails(activeRegion, info.sub, match.MatchID);
                     
-                    // Mock score - in a real implementation, you'd fetch detailed match data
-                    const randomScore = Math.floor(Math.random() * 5) + 10;
-                    const opponentScore = Math.floor(Math.random() * 5) + 8;
-                    const score = `${randomScore}-${opponentScore}`;
-                    const result = randomScore >= opponentScore ? 'Victory' : 'Defeat';
+                    if (!details || !details.matchInfo) {
+                        return {
+                            id: match.MatchID,
+                            agent: 'Unknown',
+                            result: 'Unknown',
+                            score: '-',
+                            map: 'Unknown',
+                            date: formatMatchDate(match.GameStartTime),
+                            queueName: getQueueName(match.QueueID),
+                        };
+                    }
+
+                    const playerInfo = details.players?.find((p: any) => p.subject === info.sub);
+                    let agentName = 'Unknown';
+                    let agentIcon = undefined;
+                    let result = 'Unknown';
+                    let score = '-';
                     
+                    if (playerInfo) {
+                        const agentData = agentMap.get(playerInfo.characterId.toLowerCase());
+                        if (agentData) {
+                            agentName = agentData.displayName;
+                            agentIcon = agentData.displayIconSmall;
+                        }
+
+                        const teamId = playerInfo.teamId;
+                        const myTeam = details.teams?.find((t: any) => t.teamId === teamId);
+                        const enemyTeam = details.teams?.find((t: any) => t.teamId !== teamId && t.teamId !== 'Neutral');
+                        
+                        if (myTeam && enemyTeam) {
+                            score = `${myTeam.roundsWon}-${enemyTeam.roundsWon}`;
+                            if (myTeam.won) {
+                                result = 'Victory';
+                            } else if (enemyTeam.won) {
+                                result = 'Defeat';
+                            } else {
+                                result = 'Draw';
+                            }
+                        } else if (playerInfo.stats) {
+                            // Deathmatch fallback
+                            score = `${playerInfo.stats.kills} Kills`;
+                            result = 'Completed';
+                        }
+                    }
+
+                    const mapId = details.matchInfo.mapId;
+                    const mapName = mapMap.get(mapId) || mapId.split('/').pop() || 'Unknown';
+
                     return {
                         id: match.MatchID,
-                        agent,
+                        agent: agentName,
+                        agentIcon: agentIcon,
                         result,
                         score,
-                        map,
+                        map: mapName,
                         date: formatMatchDate(match.GameStartTime),
-                        queueName: getQueueName(match.QueueID),
+                        queueName: getQueueName(details.matchInfo.queueID || match.QueueID),
                     };
-                });
+                }));
 
                 setMatches(transformedMatches);
             } else {
@@ -243,10 +295,19 @@ const styles = StyleSheet.create({
     defeatBorder: {
         borderLeftColor: '#FF4655',
     },
+    drawBorder: {
+        borderLeftColor: '#E2E2E2',
+    },
     matchMainInfo: {
         flexDirection: 'row',
         alignItems: 'center',
         flex: 1,
+    },
+    agentIcon: {
+        width: 45,
+        height: 45,
+        borderRadius: 22.5,
+        marginRight: 12,
     },
     agentPlaceholder: {
         width: 45,
@@ -278,6 +339,9 @@ const styles = StyleSheet.create({
     },
     defeatText: {
         color: '#FF4655',
+    },
+    drawText: {
+        color: '#E2E2E2',
     },
     scoreText: {
         color: Colors.dark.text,

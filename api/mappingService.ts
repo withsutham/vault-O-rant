@@ -3,6 +3,8 @@ const BASE_URL = 'https://valorant-api.com/v1';
 let cachedSkins: any[] | null = null;
 let cachedTiers: any[] | null = null;
 let cachedVersion: string | null = null;
+let cachedAgents: any[] | null = null;
+let cachedMaps: any[] | null = null;
 
 export const getClientVersion = async () => {
     if (cachedVersion) return cachedVersion;
@@ -36,6 +38,30 @@ export const getCompetitiveTiers = async () => {
         const json = await response.json();
         cachedTiers = json.data[json.data.length - 1].tiers;
         return cachedTiers;
+    } catch (e) {
+        return [];
+    }
+};
+
+export const getAgents = async () => {
+    if (cachedAgents) return cachedAgents;
+    try {
+        const response = await fetch(`${BASE_URL}/agents?isPlayableCharacter=true`);
+        const json = await response.json();
+        cachedAgents = json.data;
+        return cachedAgents;
+    } catch (e) {
+        return [];
+    }
+};
+
+export const getMaps = async () => {
+    if (cachedMaps) return cachedMaps;
+    try {
+        const response = await fetch(`${BASE_URL}/maps`);
+        const json = await response.json();
+        cachedMaps = json.data;
+        return cachedMaps;
     } catch (e) {
         return [];
     }
