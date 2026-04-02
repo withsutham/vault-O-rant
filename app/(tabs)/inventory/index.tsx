@@ -40,6 +40,9 @@ const InventoryPage = () => {
 
                 mappedSkins.sort((a: any, b: any) => a.name.localeCompare(b.name));
                 setSkins(mappedSkins);
+            } else if (inventory && inventory.Entitlements && inventory.Entitlements.length === 0) {
+                // Empty inventory is valid - just no skins
+                setSkins([]);
             }
         } catch (err) {
             console.error('Inventory Load Error:', err);

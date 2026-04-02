@@ -189,23 +189,35 @@ export const fetchStorefront = async (region: string, puuid: string) => {
         const data = await fetchWithShardFallback(puuid, `/store/v2/storefront/${puuid}`);
         return { data, isAvailable: true };
     } catch (error: any) {
+        console.log('[Store] Caught error in fetchStorefront:', error.message, error.statusCode, error.errorCode);
+        
         if (error instanceof APIError) {
-            if (error.errorCode === 'RESOURCE_NOT_FOUND') {
-                // Account not eligible - return unavailable marker
-                console.log('[Store] Account not eligible for store access');
+            // Handle 404 - account not eligible for store
+            if (error.statusCode === 404 || error.errorCode === 'RESOURCE_NOT_FOUND') {
+                console.log('[Store] Account not eligible for store access (404)');
                 return {
                     data: null,
                     isAvailable: false,
                     reason: 'UNRANKED_OR_NEW_ACCOUNT',
                     message: 'Your account will unlock the store after completing ranked placement or reaching account eligibility.'
                 };
-            } else if (error.statusCode === 401 || error.statusCode === 403) {
+            } 
+            // Handle auth errors
+            else if (error.statusCode === 401 || error.statusCode === 403) {
                 throw {
                     message: 'AUTH_ERROR',
                     isAuthError: true,
                 };
             }
+            // Handle other errors - re-throw
+            else {
+                console.log('[Store] Throwing APIError:', error.message);
+                throw error;
+            }
         }
+        
+        // Handle non-APIError exceptions
+        console.log('[Store] Throwing non-APIError:', error.message);
         throw error;
     }
 };
@@ -214,11 +226,16 @@ export const fetchInventory = async (region: string, puuid: string) => {
     try {
         return await fetchWithShardFallback(puuid, `/store/v1/entitlements/${puuid}/skin_level`);
     } catch (error: any) {
+        console.log('[Inventory] Error:', error.message, error.statusCode, error.errorCode);
+        
         if (error instanceof APIError) {
-            if (error.errorCode === 'RESOURCE_NOT_FOUND') {
+            // 404 means no inventory (new account), return empty
+            if (error.statusCode === 404 || error.errorCode === 'RESOURCE_NOT_FOUND') {
                 console.log('[Inventory] Account data not found - account may not have any skins');
-                return []; // Return empty inventory
-            } else if (error.statusCode === 401 || error.statusCode === 403) {
+                return { Entitlements: [] }; // Return proper structure
+            } 
+            // Auth errors should be thrown
+            else if (error.statusCode === 401 || error.statusCode === 403) {
                 throw {
                     message: 'AUTH_ERROR',
                     friendlyMessage: 'Your session has expired. Please sign in again.',
@@ -226,7 +243,10 @@ export const fetchInventory = async (region: string, puuid: string) => {
                 };
             }
         }
-        throw error;
+        
+        // Any other error - return empty inventory to be safe
+        console.log('[Inventory] Returning empty inventory due to error');
+        return { Entitlements: [] };
     }
 };
 

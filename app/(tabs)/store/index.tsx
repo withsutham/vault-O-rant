@@ -87,6 +87,30 @@ const StorePage = () => {
             }
         } catch (err: any) {
             console.error('Store Load Error:', err);
+            console.error('Error details:', {
+                message: err.message,
+                statusCode: err.statusCode,
+                errorCode: err.errorCode,
+                isAuthError: err.isAuthError,
+                name: err.name
+            });
+            
+            // Handle APIError exceptions
+            if (err.name === 'APIError') {
+                if (err.statusCode === 404) {
+                    setStoreUnavailable({
+                        reason: 'UNRANKED_OR_NEW_ACCOUNT',
+                        message: 'Your account will unlock the store after completing ranked placement or reaching account eligibility.'
+                    });
+                    return;
+                } else if (err.statusCode === 401 || err.statusCode === 403) {
+                    setError('Your session has expired. Please sign in again.');
+                    return;
+                } else {
+                    setError(`Store error: ${err.message}`);
+                    return;
+                }
+            }
             
             // Handle specific error types
             if (err.message === 'STORE_DATA_NOT_FOUND' || err.isAccountIneligible) {
