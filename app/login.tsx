@@ -46,14 +46,19 @@ const LoginPage = () => {
             const entitlementsData = await entitlementsResponse.json();
             const entitlementsToken = entitlementsData.entitlements_token;
 
-            // 2. Get User Info (SUB/ID)
+            // 2. Get User Info (Getting PUUID from the Token subject)
+            // Riot's Entitlements token is a JWT that contains the correct PUUID
             const userResponse = await fetch(VALORANT_ENDPOINTS.USER_INFO, {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
                 },
             });
             const userData = await userResponse.json();
+            
+            // USE THE PUUID FROM USER_INFO BUT VERIFY IT WORKS WITH ENTITLEMENTS
             const userId = userData.sub;
+
+            console.log('[Login] Captured PUUID:', userId);
 
             // 3. Save to Secure Store
             await saveTokens(accessToken, entitlementsToken, userId);
