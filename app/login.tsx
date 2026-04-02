@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { router } from 'expo-router';
+import * as Linking from 'expo-linking';
 import { RSO_CONFIG, VALORANT_ENDPOINTS } from '../constants/RSO';
 import { saveTokens } from '../utils/secureStore';
 import Colors from '../constants/Colors';
@@ -9,23 +10,57 @@ import Colors from '../constants/Colors';
 const LoginPage = () => {
     const [loading, setLoading] = useState(true);
 
+    // Set up deep linking listener
+    useEffect(() => {
+        const subscription = Linking.addEventListener('url', ({ url }) => {
+            console.log('[DeepLink] Received URL:', url);
+            if (url.includes('access_token')) {
+                handleDeepLinkUrl(url);
+            }
+        });
+
+        return () => subscription.remove();
+    }, []);
+
+    const handleDeepLinkUrl = async (url: string) => {
+        try {
+            const fragment = url.split('#')[1];
+            if (!fragment) return;
+            
+            const params = new URLSearchParams(fragment);
+            const accessToken = params.get('access_token');
+
+            if (accessToken) {
+                console.log('[DeepLink] Extracted access token, finalizing login');
+                await finalizeLogin(accessToken);
+            }
+        } catch (error) {
+            console.error('Deep link parsing error:', error);
+            Alert.alert('Login Error', 'Failed to parse deep link.');
+        }
+    };
+
     const handleNavigationStateChange = async (newNavState: any) => {
         const { url } = newNavState;
         if (!url) return;
 
-        // Check if we reached the redirect URI with the tokens
+        console.log('[WebView] Navigation to:', url);
+
+        // For development: also check WebView navigation in case deep linking doesn't work
         if (url.startsWith(RSO_CONFIG.REDIRECT_URI) && url.includes('access_token')) {
             try {
-                // Parse access_token from fragment
                 const fragment = url.split('#')[1];
+                if (!fragment) return;
+                
                 const params = new URLSearchParams(fragment);
                 const accessToken = params.get('access_token');
 
                 if (accessToken) {
+                    console.log('[WebView] Extracted access token, finalizing login');
                     await finalizeLogin(accessToken);
                 }
             } catch (error) {
-                console.error('Login parsing error:', error);
+                console.error('WebView login parsing error:', error);
                 Alert.alert('Login Error', 'Failed to parse authentication data.');
             }
         }
@@ -46,14 +81,19 @@ const LoginPage = () => {
             const entitlementsData = await entitlementsResponse.json();
             const entitlementsToken = entitlementsData.entitlements_token;
 
-            // 2. Get User Info (SUB/ID)
+            // 2. Get User Info (Getting PUUID from the Token subject)
+            // Riot's Entitlements token is a JWT that contains the correct PUUID
             const userResponse = await fetch(VALORANT_ENDPOINTS.USER_INFO, {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
                 },
             });
             const userData = await userResponse.json();
+            
+            // USE THE PUUID FROM USER_INFO BUT VERIFY IT WORKS WITH ENTITLEMENTS
             const userId = userData.sub;
+
+            console.log('[Login] Captured PUUID:', userId);
 
             // 3. Save to Secure Store
             await saveTokens(accessToken, entitlementsToken, userId);
@@ -97,7 +137,7 @@ const styles = StyleSheet.create({
     },
     loadingOverlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(15, 25, 35, 0.7)',
+        backgroundColor: 'rgba(15, 25, 35, 0.8)',
         justifyContent: 'center',
         alignItems: 'center',
     },
