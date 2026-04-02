@@ -99,8 +99,12 @@ const MatchDetailScreen = () => {
 
     if (error || !matchDetails || !playerUUID) {
         const handleExportLogs = async () => {
-            const filePath = await flushLogsToFile();
-            Alert.alert('Logs Exported', `Debug logs saved to:\n${filePath}\n\nPlease check your Documents folder.`);
+            try {
+                const result = await flushLogsToFile();
+                Alert.alert('Logs Exported', result || 'Logs have been saved');
+            } catch (err) {
+                Alert.alert('Error', `Failed to export logs: ${err}`);
+            }
         };
 
         return (

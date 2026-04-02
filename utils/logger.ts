@@ -1,6 +1,4 @@
-import * as FileSystem from 'expo-file-system';
-
-const LOG_FILE = 'file:///match_detail_debug.log';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface LogEntry {
     timestamp: string;
@@ -10,6 +8,7 @@ interface LogEntry {
 }
 
 let logBuffer: LogEntry[] = [];
+const LOG_KEY = 'match_debug_logs';
 
 export const addLog = (level: string, message: string, data?: any) => {
     const entry: LogEntry = {
@@ -41,21 +40,37 @@ export const flushLogsToFile = async () => {
             })
             .join('\n\n');
 
-        await FileSystem.writeAsStringAsync(LOG_FILE, logContent, {
-            encoding: 'utf8',
-        });
+        console.log('Attempting to save logs...');
+        console.log('Log content length:', logContent.length);
 
-        console.log('Logs saved to:', LOG_FILE);
-        
-        // Return the file path so user can access it
-        return LOG_FILE;
+        // Save to AsyncStorage (always available)
+        await AsyncStorage.setItem(LOG_KEY, logContent);
+        console.log('Logs saved to AsyncStorage');
+
+        return 'Logs saved to device storage (check Debug tab or export via Expo)';
     } catch (error) {
-        console.error('Failed to write logs:', error);
+        console.error('Failed to save logs:', error);
+        throw error;
     }
 };
 
-export const clearLogs = () => {
-    logBuffer = [];
+export const getLogs = async () => {
+    try {
+        const logs = await AsyncStorage.getItem(LOG_KEY);
+        return logs || 'No logs found';
+    } catch (error) {
+        console.error('Failed to retrieve logs:', error);
+        return null;
+    }
 };
 
-export const getLogFilePath = () => LOG_FILE;
+export const clearLogs = async () => {
+    logBuffer = [];
+    try {
+        await AsyncStorage.removeItem(LOG_KEY);
+    } catch (error) {
+        console.error('Failed to clear logs:', error);
+    }
+};
+
+export const getLogBuffer = () => logBuffer;
