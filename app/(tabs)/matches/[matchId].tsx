@@ -177,6 +177,7 @@ const MatchDetailScreen = () => {
                 <MapDetailsSection 
                     mapId={matchDetails.matchInfo?.mapId}
                     mapName={mapName}
+                    mapImage={mapData.displayIcon}
                 />
             )}
 

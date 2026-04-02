@@ -1,34 +1,32 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import Colors from '../../../../constants/Colors';
-import { getMapImageUrl } from '../../../../api/valorantService';
 
 interface MapDetailsSectionProps {
     mapId: string;
     mapName: string;
+    mapImage?: string;
 }
 
-export const MapDetailsSection: React.FC<MapDetailsSectionProps> = ({ mapId, mapName }) => {
+export const MapDetailsSection: React.FC<MapDetailsSectionProps> = ({ mapId, mapName, mapImage }) => {
     const [imageError, setImageError] = useState(false);
-    const mapImageUrl = getMapImageUrl(mapId);
 
-    console.log('Map ID:', mapId);
-    console.log('Map Image URL:', mapImageUrl);
+    console.log('MapDetailsSection - mapImage prop:', mapImage);
 
     return (
         <View style={styles.mapSection}>
             <Text style={styles.sectionTitle}>Map</Text>
-            {!imageError && (
+            {mapImage && !imageError && (
                 <Image 
-                    source={{ uri: mapImageUrl }}
+                    source={{ uri: mapImage }}
                     style={styles.mapImage}
                     onError={() => {
-                        console.log('Failed to load map image from:', mapImageUrl);
+                        console.log('Failed to load map image from:', mapImage);
                         setImageError(true);
                     }}
                 />
             )}
-            {imageError && (
+            {!mapImage || imageError && (
                 <View style={styles.mapImagePlaceholder}>
                     <Text style={styles.placeholderText}>Map image unavailable</Text>
                 </View>

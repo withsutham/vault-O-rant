@@ -15,7 +15,7 @@ export const ScoreboardTable: React.FC<ScoreboardTableProps> = ({ userTeam, enem
 
     // Try to find the name field - it might be under different names
     const getPlayerName = (player: any): string => {
-        return player.name || player.gameName || player.game_name || 'Player';
+        return player.gameName || player.name || player.game_name || 'Player';
     };
 
     return (
