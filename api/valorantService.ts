@@ -5,6 +5,42 @@ import { getClientVersion } from './mappingService';
 const CLIENT_PLATFORM = 'ew0KCSJwbGF0Zm9ybVR5cGUiOiAiUEMiLA0KCSJwbGF0Zm9ybU9TIjogIldpbmRvd3MiLA0KCSJwbGF0Zm9ybU9TVmVyc2lvbiI6ICIxMC4wLjE5MDQyLjEuMjU2LjY0Yml0IiwNCgkicGxhdGZvcm1DaGlwc2V0IjogIlVua25vd24iDQp9';
 const USER_AGENT = 'ShooterGame/13 Windows/10.0.19042.1.256.64bit';
 
+// ============================================================================
+// CACHING SYSTEM FOR MATCH DETAILS
+// ============================================================================
+interface CachedMatchData {
+    timestamp: number;
+    data: any;
+}
+
+const matchDetailsCache = new Map<string, CachedMatchData>();
+const MATCH_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+const getCacheKey = (puuid: string, matchId: string): string => `${puuid}:${matchId}`;
+
+const getCachedMatchDetails = (cacheKey: string): any | null => {
+    const cached = matchDetailsCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < MATCH_CACHE_DURATION) {
+        console.log('[Cache] ✓ Cache hit:', cacheKey.substring(0, 20));
+        return cached.data;
+    }
+    if (cached) {
+        console.log('[Cache] ⏱️ Cache expired:', cacheKey.substring(0, 20));
+        matchDetailsCache.delete(cacheKey);
+    }
+    return null;
+};
+
+const setCachedMatchDetails = (cacheKey: string, data: any): void => {
+    matchDetailsCache.set(cacheKey, { timestamp: Date.now(), data });
+    console.log('[Cache] 💾 Cached match details for:', cacheKey.substring(0, 20));
+};
+
+const clearMatchCache = (): void => {
+    matchDetailsCache.clear();
+    console.log('[Cache] 🗑️  Match details cache cleared');
+};
+
 const getRiotHeaders = async () => {
     const version = await getClientVersion();
     const { accessToken, entitlementsToken } = await getTokens();
@@ -418,3 +454,29 @@ export const fetchMatchDetails = async (region: string, puuid: string, matchId: 
         return null;
     }
 };
+
+// NEW: Fetch match details with caching (for match history)
+export const fetchMatchDetailsWithCache = async (region: string, puuid: string, matchId: string) => {
+    const cacheKey = getCacheKey(puuid, matchId);
+    
+    // Check cache first
+    const cached = getCachedMatchDetails(cacheKey);
+    if (cached !== null) {
+        return cached;
+    }
+    
+    // Fetch fresh data
+    const data = await fetchMatchDetails(region, puuid, matchId);
+    
+    // Cache the result (even if null, to avoid re-fetching failed requests)
+    if (data) {
+        setCachedMatchDetails(cacheKey, data);
+    }
+     
+     return data;
+ };
+ 
+ // NEW: Clear match details cache (for manual refresh)
+ export const clearMatchDetailsCache = (): void => {
+     clearMatchCache();
+ };

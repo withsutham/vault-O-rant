@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, Pressable, Image } from "react-native"
 import Colors from "../../../constants/Colors"
-import { getPlayerData, fetchMatchHistory, fetchMatchDetails, formatMatchDate, getQueueName } from "../../../api/valorantService"
+import { getPlayerData, fetchMatchHistory, fetchMatchDetailsWithCache, clearMatchDetailsCache, formatMatchDate, getQueueName } from "../../../api/valorantService"
 import { getAgents, getMaps } from "../../../api/mappingService"
 
 const MatchItem = ({ 
@@ -43,17 +43,75 @@ const MatchItem = ({
     </View>
 );
 
+// Helper function to calculate match statistics
+const calculateStats = (matches: any[]): { wins: number; losses: number; winRate: string; mostPlayedAgent: string } => {
+    const wins = matches.filter(m => m.result === 'Victory').length;
+    const losses = matches.filter(m => m.result === 'Defeat').length;
+    const total = wins + losses;
+    const winRate = total > 0 ? ((wins / total) * 100).toFixed(1) : '0.0';
+    
+    // Find most played agent
+    const agentCounts = new Map<string, number>();
+    matches.forEach(m => {
+        if (m.agent && m.agent !== 'Unknown') {
+            agentCounts.set(m.agent, (agentCounts.get(m.agent) || 0) + 1);
+        }
+    });
+    
+    let mostPlayedAgent = 'None';
+    let maxCount = 0;
+    agentCounts.forEach((count, agent) => {
+        if (count > maxCount) {
+            maxCount = count;
+            mostPlayedAgent = agent;
+        }
+    });
+    
+    return { wins, losses, winRate: `${winRate}%`, mostPlayedAgent };
+};
+
+// Stats Header Component
+const StatsHeader = ({ stats }: { stats: { wins: number; losses: number; winRate: string; mostPlayedAgent: string } | null }) => {
+    if (!stats) return null;
+    
+    return (
+        <View style={styles.statsHeader}>
+            <View style={styles.statItem}>
+                <Text style={styles.statLabel}>Record</Text>
+                <Text style={styles.statValue}>{stats.wins}-{stats.losses}</Text>
+            </View>
+            <View style={styles.statItem}>
+                <Text style={styles.statLabel}>Win Rate</Text>
+                <Text style={styles.statValue}>{stats.winRate}</Text>
+            </View>
+            <View style={styles.statItem}>
+                <Text style={styles.statLabel}>Main Agent</Text>
+                <Text style={styles.statValue} numberOfLines={1}>{stats.mostPlayedAgent}</Text>
+            </View>
+        </View>
+    );
+};
+
 const MatchesPage = () => {
     const [matches, setMatches] = useState<any[]>([]);
+    const [allHistoryMatches, setAllHistoryMatches] = useState<any[]>([]); // Store all fetched matches
+    const [displayedCount, setDisplayedCount] = useState(5); // Initially show 5 matches
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [guest, setGuest] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [stats, setStats] = useState<{ wins: number; losses: number; winRate: string; mostPlayedAgent: string } | null>(null);
 
     const loadMatchHistory = async () => {
         try {
             setError(null);
             setLoading(true);
+            setDisplayedCount(5); // Reset to show first 5
+            
+            // Clear cache on manual refresh to get fresh data
+            clearMatchDetailsCache();
+            
             const { info, region } = await getPlayerData();
             
             if (!info) {
@@ -69,19 +127,25 @@ const MatchesPage = () => {
                 const agentsData = await getAgents();
                 const mapsData = await getMaps();
                 
+                if (!agentsData || !mapsData) {
+                    throw new Error('Failed to load game data');
+                }
+                
                 const agentMap = new Map(agentsData.map((a: any) => [a.uuid.toLowerCase(), a]));
                 const mapMap = new Map(mapsData.map((m: any) => [m.mapUrl, m.displayName]));
 
-                // Take up to 10 matches to avoid long loading times and rate limits
-                const recentMatches = historyData.History.slice(0, 10);
+                // Process first 5 matches initially, rest on demand
+                const recentMatches = historyData.History.slice(0, 20); // Get up to 20 for lazy loading
                 
                 const transformedMatches = await Promise.all(recentMatches.map(async (match: any) => {
-                    const details = await fetchMatchDetails(activeRegion, info.sub, match.MatchID);
+                    // Use cached version for faster repeat loads
+                    const details = await fetchMatchDetailsWithCache(activeRegion, info.sub, match.MatchID);
                     
                     if (!details || !details.matchInfo) {
                         return {
                             id: match.MatchID,
                             agent: 'Unknown',
+                            agentIcon: undefined,
                             result: 'Unknown',
                             score: '-',
                             map: 'Unknown',
@@ -138,9 +202,16 @@ const MatchesPage = () => {
                     };
                 }));
 
-                setMatches(transformedMatches);
+                setAllHistoryMatches(transformedMatches);
+                setMatches(transformedMatches.slice(0, 5)); // Show first 5
+                
+                // Calculate stats
+                const stats = calculateStats(transformedMatches);
+                setStats(stats);
             } else {
+                setAllHistoryMatches([]);
                 setMatches([]);
+                setStats(null);
             }
         } catch (err: any) {
             console.error('Match History Load Error:', err);
@@ -153,6 +224,7 @@ const MatchesPage = () => {
         } finally {
             setLoading(false);
             setRefreshing(false);
+            setLoadingMore(false);
         }
     };
 
@@ -211,6 +283,23 @@ const MatchesPage = () => {
                 renderItem={({ item }) => <MatchItem {...item} />}
                 keyExtractor={item => item.id}
                 contentContainerStyle={styles.listContainer}
+                ListHeaderComponent={<StatsHeader stats={stats} />}
+                ListFooterComponent={
+                    allHistoryMatches.length > displayedCount ? (
+                        <Pressable 
+                            style={styles.loadMoreButton}
+                            onPress={() => {
+                                const newCount = Math.min(displayedCount + 5, allHistoryMatches.length);
+                                setDisplayedCount(newCount);
+                                setMatches(allHistoryMatches.slice(0, newCount));
+                            }}
+                        >
+                            <Text style={styles.loadMoreText}>
+                                Load More ({displayedCount}/{allHistoryMatches.length})
+                            </Text>
+                        </Pressable>
+                    ) : null
+                }
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.dark.tint} />}
             />
         </View>
@@ -348,10 +437,48 @@ const styles = StyleSheet.create({
         fontSize: 14,
         marginVertical: 2,
     },
-    dateText: {
-        color: Colors.dark.tabIconDefault,
-        fontSize: 10,
-    }
-})
+     dateText: {
+         color: Colors.dark.tabIconDefault,
+         fontSize: 10,
+     },
+     statsHeader: {
+         backgroundColor: Colors.dark.card,
+         padding: 16,
+         marginBottom: 16,
+         borderRadius: 8,
+         flexDirection: 'row',
+         justifyContent: 'space-around',
+         borderTopWidth: 2,
+         borderTopColor: Colors.dark.tint,
+     },
+     statItem: {
+         alignItems: 'center',
+     },
+     statLabel: {
+         color: Colors.dark.tabIconDefault,
+         fontSize: 12,
+         marginBottom: 6,
+     },
+     statValue: {
+         color: Colors.dark.text,
+         fontSize: 16,
+         fontWeight: 'bold',
+     },
+     loadMoreButton: {
+         paddingVertical: 14,
+         paddingHorizontal: 16,
+         backgroundColor: Colors.dark.card,
+         borderRadius: 8,
+         marginTop: 12,
+         alignItems: 'center',
+         borderWidth: 1,
+         borderColor: Colors.dark.tint,
+     },
+     loadMoreText: {
+         color: Colors.dark.tint,
+         fontSize: 14,
+         fontWeight: '600',
+     },
+ })
 
 export default MatchesPage
