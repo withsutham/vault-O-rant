@@ -84,10 +84,17 @@ const fetchWithShardFallback = async (puuid: string, path: string) => {
     if (!headers['X-Riot-Entitlements-JWT']) {
         console.log('[API] ⚠️ WARNING: Missing Entitlements Token - may cause 401 errors');
     }
+    if (!headers['X-Riot-ClientPlatform']) {
+        console.log('[API] ⚠️ CRITICAL: Missing X-Riot-ClientPlatform header - may cause 400 errors on Store/Inventory!');
+        throw new APIError('Missing X-Riot-ClientPlatform header', 400);
+    }
     console.log(`[API] Request Headers Summary:`);
     console.log(`  - Authorization: ${headers.Authorization ? 'Bearer ****' + headers.Authorization.slice(-10) : 'MISSING'}`);
     console.log(`  - Entitlements: ${headers['X-Riot-Entitlements-JWT'] ? `JWT ****${headers['X-Riot-Entitlements-JWT'].slice(-8)}` : 'MISSING'}`);
     console.log(`  - ClientVersion: ${headers['X-Riot-ClientVersion']}`);
+    console.log(`  - ClientPlatform: ${headers['X-Riot-ClientPlatform'] ? 'PRESENT (Base64)' : 'MISSING ⚠️'}`);
+    console.log(`  - User-Agent: ${headers['User-Agent']}`);
+    console.log(`  - Content-Type: ${headers['Content-Type']}`);
     
     // Try AP first (detected shard for Thailand), then fallback to others
     const shards = ['ap', 'kr', 'na', 'eu'];
@@ -99,6 +106,7 @@ const fetchWithShardFallback = async (puuid: string, path: string) => {
         console.log(`\n[API] ======================================`);
         console.log(`[API] Attempting Shard: ${shard.toUpperCase()}`);
         console.log(`[API] URL: ${url}`);
+        console.log(`[API] Headers being sent:`, Object.keys(headers).length, 'headers');
         console.log(`[API] ======================================`);
         
         try {
