@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Colors from '../../../constants/Colors';
 import { fetchMatchDetailsWithCache, getScoreboard } from '../../../api/valorantService';
@@ -8,8 +8,7 @@ import { getPlayerData } from '../../../api/valorantService';
 import { MatchHeaderSection } from './components/MatchHeaderSection';
 import { PlayerStatsCard } from './components/PlayerStatsCard';
 import { ScoreboardTable } from './components/ScoreboardTable';
-import { MapDetailsSection } from './components/MapDetailsSection';
-import { debugLog, infoLog, flushLogsToFile } from '../../../utils/logger';
+import { debugLog } from '../../../utils/logger';
 
 const MatchDetailScreen = () => {
     const router = useRouter();
@@ -45,7 +44,11 @@ const MatchDetailScreen = () => {
                 }
 
                 if (mapsData) {
-                    const mapMap = new Map(mapsData.map((m: any) => [m.uuid, m]));
+                    const mapMap = new Map<string, any>();
+                    mapsData.forEach((m: any) => {
+                        if (m?.uuid) mapMap.set(String(m.uuid).toLowerCase(), m);
+                        if (m?.mapUrl) mapMap.set(String(m.mapUrl).toLowerCase(), m);
+                    });
                     setMaps(mapMap);
                 }
 
@@ -98,23 +101,11 @@ const MatchDetailScreen = () => {
     }
 
     if (error || !matchDetails || !playerUUID) {
-        const handleExportLogs = async () => {
-            try {
-                const result = await flushLogsToFile();
-                Alert.alert('Logs Exported', result || 'Logs have been saved');
-            } catch (err) {
-                Alert.alert('Error', `Failed to export logs: ${err}`);
-            }
-        };
-
         return (
             <View style={styles.centerContainer}>
                 <Text style={styles.errorText}>{error || 'Unable to load match details'}</Text>
                 <Pressable style={styles.backButton} onPress={() => router.back()}>
                     <Text style={styles.backButtonText}>Go Back</Text>
-                </Pressable>
-                <Pressable style={styles.exportButton} onPress={handleExportLogs}>
-                    <Text style={styles.exportButtonText}>Export Logs</Text>
                 </Pressable>
             </View>
         );
@@ -138,15 +129,22 @@ const MatchDetailScreen = () => {
     }
     
     const mapId = matchDetails.matchInfo?.mapId;
+    const normalizedMapId = mapId ? String(mapId).toLowerCase() : '';
     debugLog('Map ID from matchInfo', mapId);
     debugLog('Available maps in map', Array.from(maps.keys()));
     
     // Try to find the map - mapId should match mapUrl
-    let mapData = maps.get(mapId);
-    if (!mapData && mapId) {
-        // Try to find by checking if any key contains this mapId
+    let mapData = maps.get(normalizedMapId);
+    if (!mapData && normalizedMapId) {
+        // Try to find by map path suffix or partial path match
+        const mapTail = normalizedMapId.split('/').pop() || '';
         for (const [key, value] of maps.entries()) {
-            if (key === mapId || key.includes(mapId.split('/').pop() || '')) {
+            const normalizedKey = key.toLowerCase();
+            if (
+                normalizedKey === normalizedMapId ||
+                normalizedKey.includes(mapTail) ||
+                normalizedMapId.includes(normalizedKey.split('/').pop() || '')
+            ) {
                 mapData = value;
                 break;
             }
@@ -157,12 +155,18 @@ const MatchDetailScreen = () => {
         debugLog('Map Data', mapData);
     }
     
-    const mapName = mapData?.displayName || 'Unknown Map';
+    const mapName = mapData?.displayName || normalizedMapId.split('/').pop() || 'Unknown Map';
     debugLog('Final Map Name', mapName);
     debugLog('==== MATCH DETAIL DEBUG END ====');
 
     return (
-        <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        <ScrollView
+            style={styles.container}
+            showsVerticalScrollIndicator={false}
+            contentInsetAdjustmentBehavior="never"
+            automaticallyAdjustContentInsets={false}
+            automaticallyAdjustsScrollIndicatorInsets={false}
+        >
             <MatchHeaderSection 
                 mapName={mapName}
                 queueID={matchDetails.matchInfo?.queueID}
@@ -171,27 +175,8 @@ const MatchDetailScreen = () => {
 
             {playerInfo && <PlayerStatsCard playerStats={playerInfo.stats} />}
 
-            {userTeam.length > 0 && <ScoreboardTable userTeam={userTeam} enemyTeam={enemyTeam} />}
+            {userTeam.length > 0 && <ScoreboardTable userTeam={userTeam} enemyTeam={enemyTeam} agents={agents} />}
 
-            {mapData && (
-                <MapDetailsSection 
-                    mapId={matchDetails.matchInfo?.mapId}
-                    mapName={mapName}
-                    mapImage={mapData.displayIcon}
-                />
-            )}
-
-            <View style={styles.exportLogsContainer}>
-                <Pressable 
-                    style={styles.exportLogsButton}
-                    onPress={async () => {
-                        const filePath = await flushLogsToFile();
-                        Alert.alert('Logs Exported', `Debug logs saved to:\n${filePath}`);
-                    }}
-                >
-                    <Text style={styles.exportLogsButtonText}>Export Debug Logs</Text>
-                </Pressable>
-            </View>
         </ScrollView>
     );
 };
@@ -228,38 +213,6 @@ const styles = StyleSheet.create({
         color: Colors.dark.text,
         fontWeight: 'bold',
         textTransform: 'uppercase',
-    },
-    exportButton: {
-        paddingHorizontal: 24,
-        paddingVertical: 12,
-        backgroundColor: Colors.dark.card,
-        borderRadius: 4,
-        marginTop: 12,
-        borderWidth: 1,
-        borderColor: Colors.dark.tint,
-    },
-    exportButtonText: {
-        color: Colors.dark.tint,
-        fontWeight: 'bold',
-        textTransform: 'uppercase',
-    },
-    exportLogsContainer: {
-        padding: 16,
-        paddingBottom: 32,
-    },
-    exportLogsButton: {
-        paddingHorizontal: 24,
-        paddingVertical: 12,
-        backgroundColor: Colors.dark.card,
-        borderRadius: 4,
-        borderWidth: 1,
-        borderColor: Colors.dark.tint,
-        alignItems: 'center',
-    },
-    exportLogsButtonText: {
-        color: Colors.dark.tint,
-        fontWeight: 'bold',
-        fontSize: 12,
     },
 });
 

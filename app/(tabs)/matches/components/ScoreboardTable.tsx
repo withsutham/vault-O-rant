@@ -1,13 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import Colors from '../../../../constants/Colors';
 
 interface ScoreboardTableProps {
     userTeam: any[];
     enemyTeam: any[];
+    agents: Map<string, any>;
 }
 
-export const ScoreboardTable: React.FC<ScoreboardTableProps> = ({ userTeam, enemyTeam }) => {
+export const ScoreboardTable: React.FC<ScoreboardTableProps> = ({ userTeam, enemyTeam, agents }) => {
     // Debug: log player structure
     if (userTeam.length > 0) {
         console.log('ScoreboardTable - Player keys available:', Object.keys(userTeam[0]));
@@ -18,6 +19,30 @@ export const ScoreboardTable: React.FC<ScoreboardTableProps> = ({ userTeam, enem
         return player.gameName || player.name || player.game_name || 'Player';
     };
 
+    const getAgentIcon = (player: any): string | undefined => {
+        const characterId = player?.characterId;
+        if (!characterId) return undefined;
+        const agent = agents.get(String(characterId).toLowerCase());
+        return agent?.displayIconSmall || agent?.displayIcon;
+    };
+
+    const comparePlayers = (a: any, b: any): number => {
+        const aKills = a?.stats?.kills ?? 0;
+        const bKills = b?.stats?.kills ?? 0;
+        if (bKills !== aKills) return bKills - aKills;
+
+        const aAssists = a?.stats?.assists ?? 0;
+        const bAssists = b?.stats?.assists ?? 0;
+        if (bAssists !== aAssists) return bAssists - aAssists;
+
+        const aDeaths = a?.stats?.deaths ?? 0;
+        const bDeaths = b?.stats?.deaths ?? 0;
+        return aDeaths - bDeaths;
+    };
+
+    const sortedUserTeam = [...userTeam].sort(comparePlayers);
+    const sortedEnemyTeam = [...enemyTeam].sort(comparePlayers);
+
     return (
         <View style={styles.scoreboardSection}>
             <Text style={styles.sectionTitle}>Full Scoreboard</Text>
@@ -26,14 +51,24 @@ export const ScoreboardTable: React.FC<ScoreboardTableProps> = ({ userTeam, enem
             {userTeam.length > 0 && (
                 <View style={styles.teamSection}>
                     <Text style={styles.teamName}>Your Team</Text>
-                    {userTeam.map((player: any, index: number) => (
-                        <View key={index} style={[styles.playerRow, index === userTeam.length - 1 && styles.lastPlayerRow]}>
-                            <Text style={styles.playerName}>{getPlayerName(player)}</Text>
-                            <Text style={styles.playerStats}>
-                                {player.stats?.kills || 0}/{player.stats?.deaths || 0}/{player.stats?.assists || 0}
-                            </Text>
-                        </View>
-                    ))}
+                    {sortedUserTeam.map((player: any, index: number) => {
+                        const agentIcon = getAgentIcon(player);
+                        return (
+                            <View key={index} style={[styles.playerRow, index === sortedUserTeam.length - 1 && styles.lastPlayerRow]}>
+                                <View style={styles.playerInfo}>
+                                    {agentIcon ? (
+                                        <Image source={{ uri: agentIcon }} style={styles.agentIcon} />
+                                    ) : (
+                                        <View style={styles.agentIconPlaceholder} />
+                                    )}
+                                    <Text style={styles.playerName}>{getPlayerName(player)}</Text>
+                                </View>
+                                <Text style={styles.playerStats}>
+                                    {player.stats?.kills || 0}/{player.stats?.deaths || 0}/{player.stats?.assists || 0}
+                                </Text>
+                            </View>
+                        );
+                    })}
                 </View>
             )}
 
@@ -41,14 +76,24 @@ export const ScoreboardTable: React.FC<ScoreboardTableProps> = ({ userTeam, enem
             {enemyTeam.length > 0 && (
                 <View style={styles.teamSection}>
                     <Text style={styles.teamName}>Enemy Team</Text>
-                    {enemyTeam.map((player: any, index: number) => (
-                        <View key={index} style={[styles.playerRow, index === enemyTeam.length - 1 && styles.lastPlayerRow]}>
-                            <Text style={styles.playerName}>{getPlayerName(player)}</Text>
-                            <Text style={styles.playerStats}>
-                                {player.stats?.kills || 0}/{player.stats?.deaths || 0}/{player.stats?.assists || 0}
-                            </Text>
-                        </View>
-                    ))}
+                    {sortedEnemyTeam.map((player: any, index: number) => {
+                        const agentIcon = getAgentIcon(player);
+                        return (
+                            <View key={index} style={[styles.playerRow, index === sortedEnemyTeam.length - 1 && styles.lastPlayerRow]}>
+                                <View style={styles.playerInfo}>
+                                    {agentIcon ? (
+                                        <Image source={{ uri: agentIcon }} style={styles.agentIcon} />
+                                    ) : (
+                                        <View style={styles.agentIconPlaceholder} />
+                                    )}
+                                    <Text style={styles.playerName}>{getPlayerName(player)}</Text>
+                                </View>
+                                <Text style={styles.playerStats}>
+                                    {player.stats?.kills || 0}/{player.stats?.deaths || 0}/{player.stats?.assists || 0}
+                                </Text>
+                            </View>
+                        );
+                    })}
                 </View>
             )}
         </View>
@@ -87,6 +132,25 @@ const styles = StyleSheet.create({
         padding: 12,
         borderBottomWidth: 1,
         borderBottomColor: Colors.dark.background,
+    },
+    playerInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        marginRight: 12,
+    },
+    agentIcon: {
+        width: 24,
+        height: 24,
+        borderRadius: 4,
+        marginRight: 8,
+    },
+    agentIconPlaceholder: {
+        width: 24,
+        height: 24,
+        borderRadius: 4,
+        marginRight: 8,
+        backgroundColor: Colors.dark.background,
     },
     lastPlayerRow: {
         borderBottomWidth: 0,

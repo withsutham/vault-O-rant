@@ -294,6 +294,9 @@ const MatchesPage = () => {
                 data={matches}
                 renderItem={({ item }) => <MatchItem {...item} onPress={handleMatchPress} />}
                 keyExtractor={item => item.id}
+                contentInsetAdjustmentBehavior="never"
+                automaticallyAdjustContentInsets={false}
+                automaticallyAdjustsScrollIndicatorInsets={false}
                 contentContainerStyle={styles.listContainer}
                 ListHeaderComponent={<StatsHeader stats={stats} />}
                 ListFooterComponent={

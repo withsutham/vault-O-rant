@@ -362,9 +362,33 @@ export const fetchMatchHistory = async (region: string, puuid: string) => {
 
 // NEW: Helper to format match timestamps
 export const formatMatchDate = (timestamp: number): string => {
-    const matchDate = new Date(timestamp);
+    const rawTimestamp = Number(timestamp);
+    if (!Number.isFinite(rawTimestamp) || rawTimestamp <= 0) {
+        return 'Unknown date';
+    }
+
+    let normalizedTimestamp = rawTimestamp;
+    if (rawTimestamp > 1e17) {
+        // nanoseconds -> milliseconds
+        normalizedTimestamp = Math.floor(rawTimestamp / 1e6);
+    } else if (rawTimestamp > 1e14) {
+        // microseconds -> milliseconds
+        normalizedTimestamp = Math.floor(rawTimestamp / 1e3);
+    } else if (rawTimestamp < 1e11) {
+        // seconds -> milliseconds
+        normalizedTimestamp = rawTimestamp * 1e3;
+    }
+
+    const matchDate = new Date(normalizedTimestamp);
+    if (Number.isNaN(matchDate.getTime())) {
+        return 'Unknown date';
+    }
+
     const now = new Date();
     const diffMs = now.getTime() - matchDate.getTime();
+    if (!Number.isFinite(diffMs) || diffMs < 0) {
+        return 'Unknown date';
+    }
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     
     if (diffDays === 0) return 'Today';

@@ -32,6 +32,7 @@ const TabsLayout = () => {
             <Tabs.Screen
                 name="matches/index"
                 options={{
+                    headerShown: false,
                     headerTitle: "Match History",
                     title: "Matches",
                     tabBarIcon: ({ color }) => <MaterialCommunityIcons size={28} name="history" color={color} />,
