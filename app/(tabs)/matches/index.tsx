@@ -1,18 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, Pressable, Image } from "react-native"
+import { useRouter } from "expo-router"
 import Colors from "../../../constants/Colors"
 import { getPlayerData, fetchMatchHistory, fetchMatchDetailsWithCache, clearMatchDetailsCache, formatMatchDate, getQueueName } from "../../../api/valorantService"
 import { getAgents, getMaps } from "../../../api/mappingService"
 
 const MatchItem = ({ 
+    id,
     agent, 
     agentIcon,
     result, 
     score, 
     map, 
     date,
-    queueName 
+    queueName,
+    onPress
 }: { 
+    id: string;
     agent: string; 
     agentIcon?: string;
     result: string; 
@@ -20,27 +24,30 @@ const MatchItem = ({
     map: string; 
     date: string;
     queueName: string;
+    onPress: (matchId: string) => void;
 }) => (
-    <View style={[styles.matchItem, result === 'Victory' ? styles.victoryBorder : (result === 'Defeat' ? styles.defeatBorder : styles.drawBorder)]}>
-        <View style={styles.matchMainInfo}>
-            {agentIcon ? (
-                <Image source={{ uri: agentIcon }} style={styles.agentIcon} />
-            ) : (
-                <View style={styles.agentPlaceholder} />
-            )}
-            <View>
-                <Text style={styles.agentName}>{agent}</Text>
-                <Text style={styles.mapName}>{map} • {queueName}</Text>
+    <Pressable onPress={() => onPress(id)}>
+        <View style={[styles.matchItem, result === 'Victory' ? styles.victoryBorder : (result === 'Defeat' ? styles.defeatBorder : styles.drawBorder)]}>
+            <View style={styles.matchMainInfo}>
+                {agentIcon ? (
+                    <Image source={{ uri: agentIcon }} style={styles.agentIcon} />
+                ) : (
+                    <View style={styles.agentPlaceholder} />
+                )}
+                <View>
+                    <Text style={styles.agentName}>{agent}</Text>
+                    <Text style={styles.mapName}>{map} • {queueName}</Text>
+                </View>
+            </View>
+            <View style={styles.matchStats}>
+                <Text style={[styles.resultText, result === 'Victory' ? styles.victoryText : (result === 'Defeat' ? styles.defeatText : styles.drawText)]}>
+                    {result}
+                </Text>
+                <Text style={styles.scoreText}>{score}</Text>
+                <Text style={styles.dateText}>{date}</Text>
             </View>
         </View>
-        <View style={styles.matchStats}>
-            <Text style={[styles.resultText, result === 'Victory' ? styles.victoryText : (result === 'Defeat' ? styles.defeatText : styles.drawText)]}>
-                {result}
-            </Text>
-            <Text style={styles.scoreText}>{score}</Text>
-            <Text style={styles.dateText}>{date}</Text>
-        </View>
-    </View>
+    </Pressable>
 );
 
 // Helper function to calculate match statistics
@@ -102,6 +109,11 @@ const MatchesPage = () => {
     const [guest, setGuest] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [stats, setStats] = useState<{ wins: number; losses: number; winRate: string; mostPlayedAgent: string } | null>(null);
+    const router = useRouter();
+
+    const handleMatchPress = (matchId: string) => {
+        router.push(`/matches/${matchId}`);
+    };
 
     const loadMatchHistory = async () => {
         try {
@@ -280,7 +292,7 @@ const MatchesPage = () => {
         <View style={styles.container}>
             <FlatList
                 data={matches}
-                renderItem={({ item }) => <MatchItem {...item} />}
+                renderItem={({ item }) => <MatchItem {...item} onPress={handleMatchPress} />}
                 keyExtractor={item => item.id}
                 contentContainerStyle={styles.listContainer}
                 ListHeaderComponent={<StatsHeader stats={stats} />}

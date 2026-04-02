@@ -1,0 +1,106 @@
+import React from 'react';
+import { View, Text, StyleSheet, FlatList } from 'react-native';
+import Colors from '../../../../constants/Colors';
+import { getACS } from '../../../../api/valorantService';
+
+interface ScoreboardTableProps {
+    userTeam: any[];
+    enemyTeam: any[];
+}
+
+export const ScoreboardTable: React.FC<ScoreboardTableProps> = ({ userTeam, enemyTeam }) => {
+    return (
+        <View style={styles.scoreboardSection}>
+            <Text style={styles.sectionTitle}>Full Scoreboard</Text>
+            
+            {/* User Team */}
+            {userTeam.length > 0 && (
+                <View style={styles.teamSection}>
+                    <Text style={styles.teamName}>Your Team</Text>
+                    {userTeam.map((player: any, index: number) => (
+                        <View key={index} style={[styles.playerRow, index === userTeam.length - 1 && styles.lastPlayerRow]}>
+                            <Text style={styles.playerName}>{player.name}</Text>
+                            <Text style={styles.playerStats}>
+                                {player.stats?.kills || 0}/{player.stats?.deaths || 0}/{player.stats?.assists || 0}
+                            </Text>
+                            <Text style={styles.playerACS}>{getACS(player.stats)}</Text>
+                        </View>
+                    ))}
+                </View>
+            )}
+
+            {/* Enemy Team */}
+            {enemyTeam.length > 0 && (
+                <View style={styles.teamSection}>
+                    <Text style={styles.teamName}>Enemy Team</Text>
+                    {enemyTeam.map((player: any, index: number) => (
+                        <View key={index} style={[styles.playerRow, index === enemyTeam.length - 1 && styles.lastPlayerRow]}>
+                            <Text style={styles.playerName}>{player.name}</Text>
+                            <Text style={styles.playerStats}>
+                                {player.stats?.kills || 0}/{player.stats?.deaths || 0}/{player.stats?.assists || 0}
+                            </Text>
+                            <Text style={styles.playerACS}>{getACS(player.stats)}</Text>
+                        </View>
+                    ))}
+                </View>
+            )}
+        </View>
+    );
+};
+
+const styles = StyleSheet.create({
+    scoreboardSection: {
+        padding: 16,
+    },
+    sectionTitle: {
+        color: Colors.dark.text,
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 12,
+    },
+    teamSection: {
+        backgroundColor: Colors.dark.card,
+        borderRadius: 8,
+        marginBottom: 16,
+        overflow: 'hidden',
+    },
+    teamName: {
+        color: Colors.dark.text,
+        fontSize: 14,
+        fontWeight: 'bold',
+        backgroundColor: Colors.dark.background,
+        padding: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.dark.tabIconDefault,
+    },
+    playerRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.dark.background,
+    },
+    lastPlayerRow: {
+        borderBottomWidth: 0,
+    },
+    playerName: {
+        color: Colors.dark.text,
+        fontSize: 14,
+        flex: 1,
+    },
+    playerStats: {
+        color: Colors.dark.tabIconDefault,
+        fontSize: 12,
+        width: 60,
+        textAlign: 'right',
+        marginRight: 12,
+    },
+    playerACS: {
+        color: Colors.dark.tint,
+        fontSize: 14,
+        fontWeight: 'bold',
+        width: 40,
+        textAlign: 'right',
+    },
+});

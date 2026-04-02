@@ -480,3 +480,44 @@ export const fetchMatchDetailsWithCache = async (region: string, puuid: string, 
  export const clearMatchDetailsCache = (): void => {
      clearMatchCache();
  };
+
+// ============================================================================
+// MATCH DETAIL STATISTICS HELPERS (for detail screen)
+// ============================================================================
+
+// Calculate headshot percentage
+export const calculateHeadshotPercent = (stats: any): number => {
+    const headshots = stats.headshots || 0;
+    const totalShots = (stats.headshots || 0) + (stats.bodyshots || 0) + (stats.legshots || 0);
+    return totalShots > 0 ? Math.round((headshots / totalShots) * 100) : 0;
+};
+
+// Calculate ACS (Average Combat Score)
+export const getACS = (stats: any): number => {
+    const score = stats.score || 0;
+    const roundsPlayed = stats.rounds_played || 1;
+    return Math.round(score / roundsPlayed);
+};
+
+// Get econ rating as formatted string
+export const getEconRating = (stats: any): string => {
+    const econ = stats.economy_rating || stats.econ_rating || 0;
+    return econ.toFixed(2);
+};
+
+// Extract scoreboard organized by team
+export const getScoreboard = (matchDetails: any, playerUUID: string) => {
+    const playerTeamId = matchDetails.players
+        ?.find((p: any) => p.subject === playerUUID)?.teamId;
+    
+    const userTeam = matchDetails.players?.filter((p: any) => p.teamId === playerTeamId) || [];
+    const enemyTeam = matchDetails.players?.filter((p: any) => p.teamId !== playerTeamId && p.teamId !== 'Neutral') || [];
+    
+    return { userTeam, enemyTeam, playerTeamId };
+};
+
+// Get map image URL from map ID
+export const getMapImageUrl = (mapId: string): string => {
+    const mapName = mapId.split('/').pop();
+    return `https://media.valorantapi.com/maps/${mapName}/displayIcon.png`;
+};
