@@ -60,6 +60,12 @@ const MatchDetailScreen = () => {
                 console.log('Match Details:', JSON.stringify(details, null, 2));
                 console.log('Players:', details.players);
                 console.log('MatchInfo:', details.matchInfo);
+                
+                // Log first player to see structure
+                if (details.players && details.players.length > 0) {
+                    console.log('First player structure:', JSON.stringify(details.players[0], null, 2));
+                    console.log('First player stats:', JSON.stringify(details.players[0].stats, null, 2));
+                }
 
                 setMatchDetails(details);
             } catch (err: any) {
@@ -94,18 +100,42 @@ const MatchDetailScreen = () => {
     }
 
     const playerInfo = matchDetails.players?.find((p: any) => p.subject === playerUUID);
+    console.log('==== MATCH DETAIL DEBUG ====');
     console.log('Player Info:', playerInfo);
+    console.log('Player Info keys:', playerInfo ? Object.keys(playerInfo) : 'N/A');
+    if (playerInfo?.stats) {
+        console.log('Player Stats keys:', Object.keys(playerInfo.stats));
+    }
     
     const { userTeam, enemyTeam, playerTeamId } = getScoreboard(matchDetails, playerUUID);
-    console.log('User Team:', userTeam);
-    console.log('Enemy Team:', enemyTeam);
+    console.log('User Team length:', userTeam.length);
+    console.log('Enemy Team length:', enemyTeam.length);
+    if (userTeam.length > 0) {
+        console.log('First user team player keys:', Object.keys(userTeam[0]));
+        console.log('First user team player:', JSON.stringify(userTeam[0], null, 2));
+    }
     
-    const mapData = maps.get(matchDetails.matchInfo?.mapId);
+    const mapId = matchDetails.matchInfo?.mapId;
+    console.log('Map ID from matchInfo:', mapId);
+    console.log('Available maps in map:', Array.from(maps.keys()));
+    
+    // Try to find the map - mapId should match mapUrl
+    let mapData = maps.get(mapId);
+    if (!mapData && mapId) {
+        // Try to find by checking if any key contains this mapId
+        for (const [key, value] of maps.entries()) {
+            if (key === mapId || key.includes(mapId.split('/').pop() || '')) {
+                mapData = value;
+                break;
+            }
+        }
+    }
+    console.log('Map Data found:', !!mapData);
     console.log('Map Data:', mapData);
-    console.log('Map ID:', matchDetails.matchInfo?.mapId);
     
     const mapName = mapData?.displayName || 'Unknown Map';
     console.log('Map Name:', mapName);
+    console.log('==== END DEBUG ====');
 
     return (
         <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>

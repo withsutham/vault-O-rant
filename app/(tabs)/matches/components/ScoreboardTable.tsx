@@ -8,6 +8,16 @@ interface ScoreboardTableProps {
 }
 
 export const ScoreboardTable: React.FC<ScoreboardTableProps> = ({ userTeam, enemyTeam }) => {
+    // Debug: log player structure
+    if (userTeam.length > 0) {
+        console.log('ScoreboardTable - Player keys available:', Object.keys(userTeam[0]));
+    }
+
+    // Try to find the name field - it might be under different names
+    const getPlayerName = (player: any): string => {
+        return player.name || player.gameName || player.game_name || 'Player';
+    };
+
     return (
         <View style={styles.scoreboardSection}>
             <Text style={styles.sectionTitle}>Full Scoreboard</Text>
@@ -18,7 +28,7 @@ export const ScoreboardTable: React.FC<ScoreboardTableProps> = ({ userTeam, enem
                     <Text style={styles.teamName}>Your Team</Text>
                     {userTeam.map((player: any, index: number) => (
                         <View key={index} style={[styles.playerRow, index === userTeam.length - 1 && styles.lastPlayerRow]}>
-                            <Text style={styles.playerName}>{player.name || 'Unknown'}</Text>
+                            <Text style={styles.playerName}>{getPlayerName(player)}</Text>
                             <Text style={styles.playerStats}>
                                 {player.stats?.kills || 0}/{player.stats?.deaths || 0}/{player.stats?.assists || 0}
                             </Text>
@@ -33,7 +43,7 @@ export const ScoreboardTable: React.FC<ScoreboardTableProps> = ({ userTeam, enem
                     <Text style={styles.teamName}>Enemy Team</Text>
                     {enemyTeam.map((player: any, index: number) => (
                         <View key={index} style={[styles.playerRow, index === enemyTeam.length - 1 && styles.lastPlayerRow]}>
-                            <Text style={styles.playerName}>{player.name || 'Unknown'}</Text>
+                            <Text style={styles.playerName}>{getPlayerName(player)}</Text>
                             <Text style={styles.playerStats}>
                                 {player.stats?.kills || 0}/{player.stats?.deaths || 0}/{player.stats?.assists || 0}
                             </Text>
