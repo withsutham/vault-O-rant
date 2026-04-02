@@ -57,6 +57,10 @@ const MatchDetailScreen = () => {
                     return;
                 }
 
+                console.log('Match Details:', JSON.stringify(details, null, 2));
+                console.log('Players:', details.players);
+                console.log('MatchInfo:', details.matchInfo);
+
                 setMatchDetails(details);
             } catch (err: any) {
                 console.error('Error loading match details:', err);
@@ -90,9 +94,18 @@ const MatchDetailScreen = () => {
     }
 
     const playerInfo = matchDetails.players?.find((p: any) => p.subject === playerUUID);
+    console.log('Player Info:', playerInfo);
+    
     const { userTeam, enemyTeam, playerTeamId } = getScoreboard(matchDetails, playerUUID);
+    console.log('User Team:', userTeam);
+    console.log('Enemy Team:', enemyTeam);
+    
     const mapData = maps.get(matchDetails.matchInfo?.mapId);
+    console.log('Map Data:', mapData);
+    console.log('Map ID:', matchDetails.matchInfo?.mapId);
+    
     const mapName = mapData?.displayName || 'Unknown Map';
+    console.log('Map Name:', mapName);
 
     return (
         <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>

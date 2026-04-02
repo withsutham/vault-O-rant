@@ -18,7 +18,7 @@ export const ScoreboardTable: React.FC<ScoreboardTableProps> = ({ userTeam, enem
                     <Text style={styles.teamName}>Your Team</Text>
                     {userTeam.map((player: any, index: number) => (
                         <View key={index} style={[styles.playerRow, index === userTeam.length - 1 && styles.lastPlayerRow]}>
-                            <Text style={styles.playerName}>{player.name}</Text>
+                            <Text style={styles.playerName}>{player.name || 'Unknown'}</Text>
                             <Text style={styles.playerStats}>
                                 {player.stats?.kills || 0}/{player.stats?.deaths || 0}/{player.stats?.assists || 0}
                             </Text>
@@ -33,7 +33,7 @@ export const ScoreboardTable: React.FC<ScoreboardTableProps> = ({ userTeam, enem
                     <Text style={styles.teamName}>Enemy Team</Text>
                     {enemyTeam.map((player: any, index: number) => (
                         <View key={index} style={[styles.playerRow, index === enemyTeam.length - 1 && styles.lastPlayerRow]}>
-                            <Text style={styles.playerName}>{player.name}</Text>
+                            <Text style={styles.playerName}>{player.name || 'Unknown'}</Text>
                             <Text style={styles.playerStats}>
                                 {player.stats?.kills || 0}/{player.stats?.deaths || 0}/{player.stats?.assists || 0}
                             </Text>

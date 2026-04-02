@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Colors from '../../../../constants/Colors';
-import { calculateHeadshotPercent, getEconRating } from '../../../../api/valorantService';
 
 interface PlayerStatsCardProps {
     playerStats: any;
@@ -10,6 +9,11 @@ interface PlayerStatsCardProps {
 export const PlayerStatsCard: React.FC<PlayerStatsCardProps> = ({ playerStats }) => {
     if (!playerStats) return null;
 
+    // Safe fallbacks for stats that might not exist
+    const kills = playerStats.kills ?? 0;
+    const deaths = playerStats.deaths ?? 0;
+    const assists = playerStats.assists ?? 0;
+
     return (
         <View style={styles.playerStatsSection}>
             <Text style={styles.sectionTitle}>Your Performance</Text>
@@ -17,16 +21,8 @@ export const PlayerStatsCard: React.FC<PlayerStatsCardProps> = ({ playerStats })
                 <View style={styles.statBox}>
                     <Text style={styles.statLabel}>K/D/A</Text>
                     <Text style={styles.statValue}>
-                        {playerStats.kills || 0}/{playerStats.deaths || 0}/{playerStats.assists || 0}
+                        {kills}/{deaths}/{assists}
                     </Text>
-                </View>
-                <View style={styles.statBox}>
-                    <Text style={styles.statLabel}>Headshot %</Text>
-                    <Text style={styles.statValue}>{calculateHeadshotPercent(playerStats)}%</Text>
-                </View>
-                <View style={styles.statBox}>
-                    <Text style={styles.statLabel}>Econ Rating</Text>
-                    <Text style={styles.statValue}>{getEconRating(playerStats)}</Text>
                 </View>
             </View>
         </View>
