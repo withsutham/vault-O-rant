@@ -3,24 +3,27 @@ import { View, Text, StyleSheet, Image, Pressable, ActivityIndicator, ScrollView
 import Colors from "../../constants/Colors"
 import { deleteTokens } from "../../utils/secureStore"
 import { router } from "expo-router"
-import { fetchUserInfo, UserInfo } from "../../api/valorantService"
+import { getPlayerData, UserInfo, UserRegion } from "../../api/valorantService"
 
 const ProfilePage = () => {
     const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+    const [userRegion, setUserRegion] = useState<UserRegion | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
     const loadData = async () => {
         setLoading(true);
-        const data = await fetchUserInfo();
-        setUserInfo(data);
+        const { info, region } = await getPlayerData();
+        setUserInfo(info);
+        setUserRegion(region);
         setLoading(false);
     };
 
     const onRefresh = async () => {
         setRefreshing(true);
-        const data = await fetchUserInfo();
-        setUserInfo(data);
+        const { info, region } = await getPlayerData();
+        setUserInfo(info);
+        setUserRegion(region);
         setRefreshing(false);
     };
 
@@ -85,6 +88,18 @@ const ProfilePage = () => {
 
             <View style={styles.detailsCard}>
                 <Text style={styles.sectionTitle}>Account Details</Text>
+                <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Region (Affinity)</Text>
+                    <Text style={styles.detailValue}>
+                        {userRegion ? userRegion.pas_affinity : 'N/A'}
+                    </Text>
+                </View>
+                <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Shard</Text>
+                    <Text style={styles.detailValue}>
+                        {userRegion ? userRegion.pas_region : 'N/A'}
+                    </Text>
+                </View>
                 <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Riot PUUID</Text>
                     <Text style={styles.detailValue} numberOfLines={1}>

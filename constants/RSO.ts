@@ -9,4 +9,5 @@ export const RSO_CONFIG = {
 export const VALORANT_ENDPOINTS = {
     ENTITLEMENTS: 'https://entitlements.auth.riotgames.com/api/token/v1',
     USER_INFO: 'https://auth.riotgames.com/userinfo',
+    REGION: 'https://riot-geo.pas.si/jasmine/v1/userinfo', // Standard endpoint to get region/shard
 };
