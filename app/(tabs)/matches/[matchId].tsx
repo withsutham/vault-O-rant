@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Colors from '../../../constants/Colors';
 import { fetchMatchDetailsWithCache, getScoreboard } from '../../../api/valorantService';
@@ -9,6 +9,7 @@ import { MatchHeaderSection } from './components/MatchHeaderSection';
 import { PlayerStatsCard } from './components/PlayerStatsCard';
 import { ScoreboardTable } from './components/ScoreboardTable';
 import { MapDetailsSection } from './components/MapDetailsSection';
+import { debugLog, infoLog, flushLogsToFile, getLogFilePath } from '../../../utils/logger';
 
 const MatchDetailScreen = () => {
     const router = useRouter();
@@ -67,6 +68,14 @@ const MatchDetailScreen = () => {
                     console.log('First player stats:', JSON.stringify(details.players[0].stats, null, 2));
                 }
 
+                debugLog('Match Details loaded', details);
+                debugLog('Players array', details.players);
+                debugLog('MatchInfo', details.matchInfo);
+                if (details.players && details.players.length > 0) {
+                    debugLog('First player structure', details.players[0]);
+                    debugLog('First player stats', details.players[0].stats);
+                }
+
                 setMatchDetails(details);
             } catch (err: any) {
                 console.error('Error loading match details:', err);
@@ -89,35 +98,44 @@ const MatchDetailScreen = () => {
     }
 
     if (error || !matchDetails || !playerUUID) {
+        const handleExportLogs = async () => {
+            const filePath = await flushLogsToFile();
+            Alert.alert('Logs Exported', `Debug logs saved to:\n${filePath}\n\nPlease check your Documents folder.`);
+        };
+
         return (
             <View style={styles.centerContainer}>
                 <Text style={styles.errorText}>{error || 'Unable to load match details'}</Text>
                 <Pressable style={styles.backButton} onPress={() => router.back()}>
                     <Text style={styles.backButtonText}>Go Back</Text>
                 </Pressable>
+                <Pressable style={styles.exportButton} onPress={handleExportLogs}>
+                    <Text style={styles.exportButtonText}>Export Logs</Text>
+                </Pressable>
             </View>
         );
     }
 
     const playerInfo = matchDetails.players?.find((p: any) => p.subject === playerUUID);
-    console.log('==== MATCH DETAIL DEBUG ====');
-    console.log('Player Info:', playerInfo);
-    console.log('Player Info keys:', playerInfo ? Object.keys(playerInfo) : 'N/A');
+    debugLog('==== MATCH DETAIL DEBUG START ====');
+    debugLog('Player Info found', !!playerInfo);
+    debugLog('Player Info keys', playerInfo ? Object.keys(playerInfo) : 'N/A');
     if (playerInfo?.stats) {
-        console.log('Player Stats keys:', Object.keys(playerInfo.stats));
+        debugLog('Player Stats keys', Object.keys(playerInfo.stats));
+        debugLog('Player Stats values', playerInfo.stats);
     }
     
     const { userTeam, enemyTeam, playerTeamId } = getScoreboard(matchDetails, playerUUID);
-    console.log('User Team length:', userTeam.length);
-    console.log('Enemy Team length:', enemyTeam.length);
+    debugLog('User Team length', userTeam.length);
+    debugLog('Enemy Team length', enemyTeam.length);
     if (userTeam.length > 0) {
-        console.log('First user team player keys:', Object.keys(userTeam[0]));
-        console.log('First user team player:', JSON.stringify(userTeam[0], null, 2));
+        debugLog('First user team player keys', Object.keys(userTeam[0]));
+        debugLog('First user team player full data', userTeam[0]);
     }
     
     const mapId = matchDetails.matchInfo?.mapId;
-    console.log('Map ID from matchInfo:', mapId);
-    console.log('Available maps in map:', Array.from(maps.keys()));
+    debugLog('Map ID from matchInfo', mapId);
+    debugLog('Available maps in map', Array.from(maps.keys()));
     
     // Try to find the map - mapId should match mapUrl
     let mapData = maps.get(mapId);
@@ -130,12 +148,14 @@ const MatchDetailScreen = () => {
             }
         }
     }
-    console.log('Map Data found:', !!mapData);
-    console.log('Map Data:', mapData);
+    debugLog('Map Data found', !!mapData);
+    if (mapData) {
+        debugLog('Map Data', mapData);
+    }
     
     const mapName = mapData?.displayName || 'Unknown Map';
-    console.log('Map Name:', mapName);
-    console.log('==== END DEBUG ====');
+    debugLog('Final Map Name', mapName);
+    debugLog('==== MATCH DETAIL DEBUG END ====');
 
     return (
         <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -155,6 +175,18 @@ const MatchDetailScreen = () => {
                     mapName={mapName}
                 />
             )}
+
+            <View style={styles.exportLogsContainer}>
+                <Pressable 
+                    style={styles.exportLogsButton}
+                    onPress={async () => {
+                        const filePath = await flushLogsToFile();
+                        Alert.alert('Logs Exported', `Debug logs saved to:\n${filePath}`);
+                    }}
+                >
+                    <Text style={styles.exportLogsButtonText}>Export Debug Logs</Text>
+                </Pressable>
+            </View>
         </ScrollView>
     );
 };
@@ -191,6 +223,38 @@ const styles = StyleSheet.create({
         color: Colors.dark.text,
         fontWeight: 'bold',
         textTransform: 'uppercase',
+    },
+    exportButton: {
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        backgroundColor: Colors.dark.card,
+        borderRadius: 4,
+        marginTop: 12,
+        borderWidth: 1,
+        borderColor: Colors.dark.tint,
+    },
+    exportButtonText: {
+        color: Colors.dark.tint,
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+    },
+    exportLogsContainer: {
+        padding: 16,
+        paddingBottom: 32,
+    },
+    exportLogsButton: {
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        backgroundColor: Colors.dark.card,
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: Colors.dark.tint,
+        alignItems: 'center',
+    },
+    exportLogsButtonText: {
+        color: Colors.dark.tint,
+        fontWeight: 'bold',
+        fontSize: 12,
     },
 });
 
