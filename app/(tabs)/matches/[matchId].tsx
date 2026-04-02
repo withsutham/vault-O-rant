@@ -9,7 +9,7 @@ import { MatchHeaderSection } from './components/MatchHeaderSection';
 import { PlayerStatsCard } from './components/PlayerStatsCard';
 import { ScoreboardTable } from './components/ScoreboardTable';
 import { MapDetailsSection } from './components/MapDetailsSection';
-import { debugLog, infoLog, flushLogsToFile, getLogFilePath } from '../../../utils/logger';
+import { debugLog, infoLog, flushLogsToFile } from '../../../utils/logger';
 
 const MatchDetailScreen = () => {
     const router = useRouter();
@@ -45,7 +45,7 @@ const MatchDetailScreen = () => {
                 }
 
                 if (mapsData) {
-                    const mapMap = new Map(mapsData.map((m: any) => [m.mapUrl, m]));
+                    const mapMap = new Map(mapsData.map((m: any) => [m.uuid, m]));
                     setMaps(mapMap);
                 }
 
