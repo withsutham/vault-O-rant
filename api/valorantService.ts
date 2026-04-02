@@ -65,7 +65,7 @@ export class APIError extends Error {
     }
 }
 
-const fetchWithShardFallback = async (puuid: string, path: string) => {
+const fetchWithShardFallback = async (puuid: string, path: string, method: string = 'GET') => {
     // Validate PUUID format
     const puuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!puuidRegex.test(puuid)) {
@@ -95,6 +95,7 @@ const fetchWithShardFallback = async (puuid: string, path: string) => {
     console.log(`  - ClientPlatform: ${headers['X-Riot-ClientPlatform'] ? 'PRESENT (Base64)' : 'MISSING ⚠️'}`);
     console.log(`  - User-Agent: ${headers['User-Agent']}`);
     console.log(`  - Content-Type: ${headers['Content-Type']}`);
+    console.log(`[API] Request Method: ${method}`);
     
     // Try AP first (detected shard for Thailand), then fallback to others
     const shards = ['ap', 'kr', 'na', 'eu'];
@@ -106,11 +107,16 @@ const fetchWithShardFallback = async (puuid: string, path: string) => {
         console.log(`\n[API] ======================================`);
         console.log(`[API] Attempting Shard: ${shard.toUpperCase()}`);
         console.log(`[API] URL: ${url}`);
+        console.log(`[API] Method: ${method}`);
         console.log(`[API] Headers being sent:`, Object.keys(headers).length, 'headers');
         console.log(`[API] ======================================`);
         
         try {
-            const res = await fetchWithTimeout(url, { headers }, 5000);
+            const fetchOptions: any = { headers, method };
+            if (method === 'POST') {
+                fetchOptions.body = JSON.stringify({});
+            }
+            const res = await fetchWithTimeout(url, fetchOptions, 5000);
             
             console.log(`[API] Response Status: ${res.status} ${res.statusText}`);
             
@@ -194,7 +200,7 @@ const fetchWithShardFallback = async (puuid: string, path: string) => {
 
 export const fetchStorefront = async (region: string, puuid: string) => {
     try {
-        const data = await fetchWithShardFallback(puuid, `/store/v2/storefront/${puuid}`);
+        const data = await fetchWithShardFallback(puuid, `/store/v3/storefront/${puuid}`, 'POST');
         return { data, isAvailable: true };
     } catch (error: any) {
         console.log('[Store] Caught error in fetchStorefront:', error.message, error.statusCode, error.errorCode);
@@ -389,4 +395,26 @@ export const getPeakRankFromHistory = (history: any): { tier: number; name: stri
         name: getTierName(peakTier),
         episode: peakEpisode,
     };
+};
+
+// NEW: Fetch specific match details
+export const fetchMatchDetails = async (region: string, puuid: string, matchId: string) => {
+    try {
+        console.log('[MatchDetails] Fetching match details for', matchId);
+        return await fetchWithShardFallback(
+            puuid,
+            `/match-details/v1/matches/${matchId}`
+        );
+    } catch (error: any) {
+        if (error instanceof APIError) {
+            if (error.statusCode === 401 || error.statusCode === 403) {
+                throw {
+                    message: 'AUTH_ERROR',
+                    isAuthError: true,
+                };
+            }
+        }
+        console.log('[MatchDetails] Failed to fetch:', error.message);
+        return null;
+    }
 };
