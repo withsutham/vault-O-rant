@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Colors from '../../../../constants/Colors';
-import { calculateHeadshotPercent, getACS, getEconRating } from '../../../../api/valorantService';
+import { calculateHeadshotPercent, getEconRating } from '../../../../api/valorantService';
 
 interface PlayerStatsCardProps {
     playerStats: any;
@@ -19,10 +19,6 @@ export const PlayerStatsCard: React.FC<PlayerStatsCardProps> = ({ playerStats })
                     <Text style={styles.statValue}>
                         {playerStats.kills || 0}/{playerStats.deaths || 0}/{playerStats.assists || 0}
                     </Text>
-                </View>
-                <View style={styles.statBox}>
-                    <Text style={styles.statLabel}>ACS</Text>
-                    <Text style={styles.statValue}>{getACS(playerStats)}</Text>
                 </View>
                 <View style={styles.statBox}>
                     <Text style={styles.statLabel}>Headshot %</Text>
@@ -48,12 +44,10 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     statsGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
+        flexDirection: 'column',
         justifyContent: 'space-between',
     },
     statBox: {
-        width: '48%',
         backgroundColor: Colors.dark.card,
         padding: 12,
         borderRadius: 8,

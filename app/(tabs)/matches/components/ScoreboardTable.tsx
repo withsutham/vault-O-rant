@@ -1,7 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import Colors from '../../../../constants/Colors';
-import { getACS } from '../../../../api/valorantService';
 
 interface ScoreboardTableProps {
     userTeam: any[];
@@ -23,7 +22,6 @@ export const ScoreboardTable: React.FC<ScoreboardTableProps> = ({ userTeam, enem
                             <Text style={styles.playerStats}>
                                 {player.stats?.kills || 0}/{player.stats?.deaths || 0}/{player.stats?.assists || 0}
                             </Text>
-                            <Text style={styles.playerACS}>{getACS(player.stats)}</Text>
                         </View>
                     ))}
                 </View>
@@ -39,7 +37,6 @@ export const ScoreboardTable: React.FC<ScoreboardTableProps> = ({ userTeam, enem
                             <Text style={styles.playerStats}>
                                 {player.stats?.kills || 0}/{player.stats?.deaths || 0}/{player.stats?.assists || 0}
                             </Text>
-                            <Text style={styles.playerACS}>{getACS(player.stats)}</Text>
                         </View>
                     ))}
                 </View>
@@ -92,15 +89,6 @@ const styles = StyleSheet.create({
     playerStats: {
         color: Colors.dark.tabIconDefault,
         fontSize: 12,
-        width: 60,
-        textAlign: 'right',
-        marginRight: 12,
-    },
-    playerACS: {
-        color: Colors.dark.tint,
-        fontSize: 14,
-        fontWeight: 'bold',
-        width: 40,
         textAlign: 'right',
     },
 });
