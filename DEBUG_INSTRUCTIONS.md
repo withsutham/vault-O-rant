@@ -2,69 +2,96 @@
 
 ## How to Export Logs
 
-1. **Start the app** using Expo (Android, iOS, or web)
-2. **Navigate to Match History** - Go to the Matches tab
-3. **Tap on any match** to open the detail screen
-4. **Scroll to the bottom** of the match detail screen
-5. **Tap "Export Debug Logs"** button
-6. **An alert will appear** with the file path where logs were saved
+1. **Start the app** using Expo
+2. **Go to Match History** → Tap any match
+3. **Scroll to the bottom** of the match detail screen
+4. **Tap "Export Debug Logs"** button
+5. **Check the alert message** - it will say logs are saved
 
-## Where to Find the Logs
+## Accessing the Logs
 
-The debug logs are saved to your device's Documents folder:
-- **iOS**: Documents/match_detail_debug.log
-- **Android**: Documents/match_detail_debug.log
+The logs are saved to your device's local storage using AsyncStorage. Here are the ways to access them:
 
-## What the Logs Contain
+### Method 1: Use Expo Dev Tools (Recommended)
+1. In your Expo app, open the developer menu (shake device or Ctrl+M)
+2. Look for "Debug" or "AsyncStorage" option
+3. View the logs stored in the app
 
-The exported log file includes detailed information about:
+### Method 2: Share via Expo
+If sharing is enabled:
+1. After tapping "Export Debug Logs"
+2. A share menu may appear
+3. Share the file to email, cloud storage, etc.
 
-1. **Player Data Structure**
-   - All field names available in the player object
-   - Player stats object structure and values
-   - Full player data for the first player on your team
+### Method 3: Check Console
+1. Keep your terminal/console open while running the app
+2. When you tap "Export Debug Logs"
+3. Check the console output - all logs are also printed there
 
-2. **Team Information**
-   - Number of players on your team
-   - Number of players on enemy team
-   - First player's complete data structure
+## What the Logs Show
+
+The exported logs include:
+
+1. **Player Information**
+   - All field names in the player object
+   - What's in the player.stats object
+   - Full data for first player
+
+2. **Team Data**
+   - How many players per team
+   - Player structure details
 
 3. **Map Information**
-   - Map ID from the match details
-   - All available map names in the system
-   - Whether the map lookup succeeded
-   - Full map data if found
+   - Map ID from match details
+   - Map lookup results
+   - Full map data if available
 
 4. **Timestamps**
-   - Each log entry has an ISO timestamp
-   - Helps track the exact order of operations
+   - Exact time each event occurred
+   - Helps track execution order
 
-## Steps to Share the Log
+## Steps to Share With Developer
 
-1. After exporting, the log file will be in your Documents folder
-2. Share the `match_detail_debug.log` file with the developer
-3. The developer can then see:
-   - What fields actually exist in the API response
-   - Why certain data isn't displaying (missing fields, wrong field names, etc.)
-   - What the actual data structure looks like
+Since the logs are in device storage:
 
-## Example Log Output Structure
+1. **Option A: Copy from Console**
+   - Open the terminal/console when running the app
+   - When you export logs, all debug messages print there
+   - Copy the output and share it
+
+2. **Option B: Share via Alert**
+   - The alert popup shows confirmation
+   - Share that message with the developer
+
+3. **Option C: Check Terminal Output**
+   - Run: `npm start` or `expo start`
+   - Look for `[DEBUG]` lines when loading a match
+   - Copy those lines to share
+
+## Common Issues & Solutions
+
+**Problem**: Alert says "undefined"
+- **Solution**: This was fixed - you should now see "Logs saved to device storage"
+
+**Problem**: Logs don't appear in console
+- **Solution**: Make sure you're running the app with the terminal visible
+
+**Problem**: Can't find the logs
+- **Solution**: They're in the app's local storage - use Expo dev tools to access
+
+## Quick Example
+
+When you load a match detail screen, you'll see console output like:
 
 ```
-[2026-04-03T12:34:56.789Z] [DEBUG] ==== MATCH DETAIL DEBUG START ====
-
-[2026-04-03T12:34:56.790Z] [DEBUG] Player Info found
+[DEBUG] ==== MATCH DETAIL DEBUG START ====
+[DEBUG] Player Info found
 Data: true
-
-[2026-04-03T12:34:56.791Z] [DEBUG] Player Info keys
+[DEBUG] Player Info keys
 Data: ["subject", "teamId", "characterId", "stats", ...]
-
-[2026-04-03T12:34:56.792Z] [DEBUG] Player Stats keys
-Data: ["kills", "deaths", "assists", "score", ...]
+[DEBUG] Player Stats keys
+Data: ["kills", "deaths", "assists", ...]
 ```
 
-## Troubleshooting
+**Copy this console output and share it with the developer!**
 
-- If the button doesn't appear, make sure you've scrolled to the bottom
-- If logs aren't created, check that you have file system permissions
-- The alert will show you the exact path where logs were saved
