@@ -59,7 +59,7 @@ const LoginPage = () => {
             await saveTokens(accessToken, entitlementsToken, userId);
 
             // 4. Redirect to Tabs
-            router.replace('/(tabs)');
+            router.replace('/(tabs)/profile');
         } catch (error) {
             console.error('Finalize login error:', error);
             Alert.alert('Login Error', 'Failed to complete authentication with Riot.');
