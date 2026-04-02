@@ -1,6 +1,6 @@
 import * as FileSystem from 'expo-file-system';
 
-const LOG_FILE = FileSystem.documentDirectory + 'match_detail_debug.log';
+const LOG_FILE = 'file:///match_detail_debug.log';
 
 interface LogEntry {
     timestamp: string;
@@ -42,7 +42,7 @@ export const flushLogsToFile = async () => {
             .join('\n\n');
 
         await FileSystem.writeAsStringAsync(LOG_FILE, logContent, {
-            encoding: FileSystem.EncodingType.UTF8,
+            encoding: 'utf8',
         });
 
         console.log('Logs saved to:', LOG_FILE);
