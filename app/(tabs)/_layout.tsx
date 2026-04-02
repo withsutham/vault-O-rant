@@ -22,7 +22,7 @@ const TabsLayout = () => {
             }
         }}>
             <Tabs.Screen
-                name="index"
+                name="profile"
                 options={{
                     headerTitle: "Player Profile",
                     title: "Profile",
