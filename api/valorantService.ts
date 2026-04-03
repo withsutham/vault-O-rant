@@ -422,6 +422,23 @@ export const fetchInventory = async (region: string, puuid: string, forceRefresh
     }
 };
 
+export const fetchWallet = async (region: string, puuid: string) => {
+    try {
+        return await fetchWithShardFallback(puuid, `/store/v1/wallet/${puuid}`);
+    } catch (error: any) {
+        if (error instanceof APIError) {
+            if (error.statusCode === 401 || error.statusCode === 403) {
+                throw {
+                    message: 'AUTH_ERROR',
+                    friendlyMessage: 'Your session has expired. Please sign in again.',
+                    isAuthError: true,
+                };
+            }
+        }
+        return { Balances: {} };
+    }
+};
+
 export const fetchPlayerMMR = async (region: string, puuid: string) => {
     try {
         // Preferred endpoint from current docs: /mmr/v1/players/{puuid}
