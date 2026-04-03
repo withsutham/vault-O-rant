@@ -41,7 +41,7 @@ npm install
 2. Run the app:
 
 ```bash
-npm run start
+npx expo start
 ```
 
 3. Open on device/emulator:
