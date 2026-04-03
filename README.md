@@ -2,7 +2,7 @@
 
 Mobile companion app for checking VALORANT profile, rank, match history, store offers, and owned inventory in one place.
 
-This app runs on Expo and follows the React Native + Expo Router fundamentals practiced in `fundamental/`.
+This app runs on Expo and follows the React Native + Expo Router
 
 ## Features
 
@@ -44,11 +44,7 @@ npm install
 npx expo start
 ```
 
-3. Open on device/emulator:
-
-- Android: `npm run android`
-- iOS: `npm run ios`
-- Web: `npm run web`
+3. Open on device/emulator
 
 ## Project Structure
 
