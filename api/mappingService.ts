@@ -5,6 +5,7 @@ let cachedTiers: any[] | null = null;
 let cachedVersion: string | null = null;
 let cachedAgents: any[] | null = null;
 let cachedMaps: any[] | null = null;
+let cachedPlayerCards: any[] | null = null;
 
 export const getClientVersion = async () => {
     if (cachedVersion) return cachedVersion;
@@ -62,6 +63,18 @@ export const getMaps = async () => {
         const json = await response.json();
         cachedMaps = json.data;
         return cachedMaps;
+    } catch (e) {
+        return [];
+    }
+};
+
+export const getPlayerCards = async () => {
+    if (cachedPlayerCards) return cachedPlayerCards;
+    try {
+        const response = await fetch(`${BASE_URL}/playercards`);
+        const json = await response.json();
+        cachedPlayerCards = json.data;
+        return cachedPlayerCards;
     } catch (e) {
         return [];
     }

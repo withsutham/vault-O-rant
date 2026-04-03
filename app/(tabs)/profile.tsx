@@ -3,13 +3,14 @@ import { View, Text, StyleSheet, Image, Pressable, ActivityIndicator, ScrollView
 import Colors from "../../constants/Colors"
 import { deleteTokens } from "../../utils/secureStore"
 import { router } from "expo-router"
-import { getPlayerData, fetchPlayerMMR, fetchCompetitiveHistory, getPeakRankFromHistory } from "../../api/valorantService"
-import { getCompetitiveTiers } from "../../api/mappingService"
+import { getPlayerData, fetchPlayerMMR, fetchCompetitiveHistory, getPeakRankFromHistory, fetchPlayerLoadout } from "../../api/valorantService"
+import { getCompetitiveTiers, getPlayerCards } from "../../api/mappingService"
 
 const ProfilePage = () => {
     const [userInfo, setUserInfo] = useState<any>(null);
     const [userRegion, setUserRegion] = useState<any>(null);
     const [rankData, setRankData] = useState<any>(null);
+    const [playerBanner, setPlayerBanner] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -25,16 +26,41 @@ const ProfilePage = () => {
                 const playerMmr = await fetchPlayerMMR(region.pas_region, info.sub);
                 const tiers = await getCompetitiveTiers();
 
+                try {
+                    const loadout = await fetchPlayerLoadout(region.pas_region, info.sub);
+                    const playerCardId = loadout?.Identity?.PlayerCardID;
+                    if (playerCardId) {
+                        const cards = await getPlayerCards();
+                        const card = (cards || []).find((c: any) => c.uuid?.toLowerCase() === String(playerCardId).toLowerCase());
+                        if (card) {
+                            setPlayerBanner(card.wideArt || card.largeArt || card.displayIcon || null);
+                        }
+                    }
+                } catch {
+                    setPlayerBanner(null);
+                }
+
                 if (playerMmr && playerMmr.LatestCompetitiveUpdate && tiers && tiers.length > 0) {
                     const currentTier = playerMmr.LatestCompetitiveUpdate.TierAfterUpdate || 0;
                     const rr = playerMmr.LatestCompetitiveUpdate.RankedRatingAfterUpdate || 0;
-                    const tierInfo = tiers.find((t: any) => t.tier === currentTier);
+                    const fallbackTier = playerMmr.CurrentCompetitiveTier || 0;
+                    const fallbackRr = playerMmr.RankedRating || 0;
+                    const resolvedTier = currentTier > 0 ? currentTier : fallbackTier;
+                    const resolvedRr = currentTier > 0 ? rr : fallbackRr;
+                    const tierInfo = tiers.find((t: any) => t.tier === resolvedTier);
                     
-                    if (tierInfo) {
+                    if (resolvedTier > 0 && tierInfo) {
                         setRankData({
                             name: tierInfo.tierName,
                             icon: tierInfo.largeIcon,
-                            rr: rr,
+                            rr: resolvedRr,
+                            isUnranked: false,
+                        });
+                    } else if (resolvedTier > 0) {
+                        setRankData({
+                            name: `Tier ${resolvedTier}`,
+                            icon: null,
+                            rr: resolvedRr,
                             isUnranked: false,
                         });
                     }
@@ -57,6 +83,7 @@ const ProfilePage = () => {
                 }
             } else if (!info) {
                 console.log('No user info found - user may be a guest');
+                setPlayerBanner(null);
             }
         } catch (error: any) {
             console.error('Profile loadData error:', error);
@@ -105,8 +132,8 @@ const ProfilePage = () => {
         >
             <View style={styles.header}>
                 <View style={styles.avatarPlaceholder}>
-                    {rankData?.icon ? (
-                        <Image source={{ uri: rankData.icon }} style={{ width: 60, height: 60 }} />
+                    {playerBanner ? (
+                        <Image source={{ uri: playerBanner }} style={styles.bannerImage} resizeMode="cover" />
                     ) : (
                         <Text style={styles.avatarText}>
                             {userInfo ? userInfo.acct.game_name.charAt(0).toUpperCase() : '?'}
@@ -212,14 +239,19 @@ const styles = StyleSheet.create({
         marginBottom: 30,
     },
     avatarPlaceholder: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
+        width: 120,
+        height: 68,
+        borderRadius: 10,
         backgroundColor: Colors.dark.card,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 1,
         borderColor: '#2D3945',
+        overflow: 'hidden',
+    },
+    bannerImage: {
+        width: '100%',
+        height: '100%',
     },
     avatarText: {
         color: Colors.dark.text,
