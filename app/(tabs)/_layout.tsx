@@ -30,7 +30,7 @@ const TabsLayout = () => {
                 }}
             />
             <Tabs.Screen
-                name="matches/index"
+                name="matches"
                 options={{
                     headerShown: false,
                     headerTitle: "Match History",

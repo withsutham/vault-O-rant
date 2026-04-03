@@ -13,23 +13,23 @@ const StackLayout = () => {
         headerTintColor: Colors.dark.text,
         headerTitleStyle: {
           color: Colors.dark.text,
-          fontSize: 16,
-          fontWeight: "600",
+          fontSize: 20,
+          fontWeight: "bold",
         },
       }}
     >
       <Stack.Screen
         name="index"
         options={{
-          headerTitle: "",
-          headerShown: false
+          headerTitle: "MATCHES",
+          headerShown: true,
         }}
       />
       <Stack.Screen
         name="[matchId]"
         options={{
-          headerTitle: "",
-          headerShown: false,
+          headerTitle: "MATCH DETAILS",
+          headerShown: true,
         }}
       />
     </Stack>
