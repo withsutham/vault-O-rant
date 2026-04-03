@@ -2,10 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Image, ScrollView, ActivityIndicator, RefreshControl, Pressable } from "react-native"
 import { useRouter } from 'expo-router';
 import Colors from "../../../constants/Colors"
-import { getPlayerData, fetchStorefront } from "../../../api/valorantService"
+import { getPlayerData, fetchStorefront, fetchWallet } from "../../../api/valorantService"
 import { getAllSkins } from "../../../api/mappingService"
 import { normalizeAppError } from '../../../utils/appErrors';
 import { trackEvent } from '../../../utils/analytics';
+
+const VP_CURRENCY_ID = '85ad13f7-3d1b-5128-9eb2-7cd8ee0b5741';
+const RADIANITE_CURRENCY_ID = 'e59aa87c-4cbf-517a-5983-6e81511be9b7';
 
 const StorePage = () => {
     const router = useRouter();
@@ -19,6 +22,7 @@ const StorePage = () => {
     const [storeUnavailable, setStoreUnavailable] = useState<{ reason: string; message: string } | null>(null);
     const [debugInfo, setDebugInfo] = useState<string | null>(null);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+    const [wallet, setWallet] = useState<{ vp: number; radianite: number } | null>(null);
 
     const loadStoreData = async (forceRefresh: boolean = false) => {
         try {
@@ -39,7 +43,15 @@ const StorePage = () => {
 
             setGuest(false);
             const activeRegion = region?.pas_region || 'ap';
-            const storefrontResponse = await fetchStorefront(activeRegion, info.sub, forceRefresh);
+            const [storefrontResponse, walletData] = await Promise.all([
+                fetchStorefront(activeRegion, info.sub, forceRefresh),
+                fetchWallet(activeRegion, info.sub),
+            ]);
+
+            setWallet({
+                vp: Number(walletData?.Balances?.[VP_CURRENCY_ID] || 0),
+                radianite: Number(walletData?.Balances?.[RADIANITE_CURRENCY_ID] || 0),
+            });
 
             // Check if store is available
             if (!storefrontResponse.isAvailable) {
@@ -60,21 +72,30 @@ const StorePage = () => {
 
             if (storefront && storefront.SkinsPanelLayout && allSkins && allSkins.length > 0) {
                 const dailyOfferUuids = storefront.SkinsPanelLayout.SingleItemOffers;
+                const singleItemStoreOffers = storefront.SkinsPanelLayout.SingleItemStoreOffers || [];
+                const costByOfferId = new Map(
+                    singleItemStoreOffers.map((offer: any) => [
+                        String(offer?.OfferID || '').toLowerCase(),
+                        Number(offer?.Cost?.[VP_CURRENCY_ID] || 0),
+                    ])
+                );
                 
                 const mappedOffers = dailyOfferUuids.map((uuid: string) => {
                     let skinMatch = null;
+                    const price = costByOfferId.get(String(uuid).toLowerCase()) || 0;
                     for (const skin of allSkins) {
                         const levelMatch = skin.levels.find((l: any) => l.uuid.toLowerCase() === uuid.toLowerCase());
                         if (levelMatch) {
                             skinMatch = {
                                 name: skin.displayName,
                                 image: levelMatch.displayIcon || skin.displayIcon,
-                                uuid: uuid
+                                uuid: uuid,
+                                price,
                             };
                             break;
                         }
                     }
-                    return skinMatch || { name: 'Unknown Skin', image: null, uuid };
+                    return skinMatch || { name: 'Unknown Skin', image: null, uuid, price };
                 });
 
                 setOffers(mappedOffers);
@@ -95,7 +116,7 @@ const StorePage = () => {
                                     name: skin.displayName,
                                     image: levelMatch.displayIcon || skin.displayIcon,
                                     discount: offer.DiscountPercent,
-                                    price: offer.DiscountCosts[Object.keys(offer.DiscountCosts)[0]]
+                                    price: offer.DiscountCosts?.[VP_CURRENCY_ID] || offer.DiscountCosts?.[Object.keys(offer.DiscountCosts || {})[0]] || 0,
                                 };
                                 break;
                             }
@@ -267,6 +288,18 @@ const StorePage = () => {
                     <Text style={styles.debugText}>{debugInfo}</Text>
                 </View>
             ) : null}
+            {wallet ? (
+                <View style={styles.walletRow}>
+                    <View style={styles.walletPill}>
+                        <Text style={styles.walletLabel}>VP</Text>
+                        <Text style={styles.walletValue}>{wallet.vp}</Text>
+                    </View>
+                    <View style={styles.walletPill}>
+                        <Text style={styles.walletLabel}>R</Text>
+                        <Text style={styles.walletValue}>{wallet.radianite}</Text>
+                    </View>
+                </View>
+            ) : null}
             <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Daily Offers</Text>
             </View>
@@ -284,6 +317,7 @@ const StorePage = () => {
                         </View>
                         <View style={styles.skinInfo}>
                             <Text style={styles.skinName} numberOfLines={1}>{item.name}</Text>
+                            <Text style={styles.priceText}>{item.price ? `${item.price} VP` : 'N/A'}</Text>
                         </View>
                     </View>
                 ))}
@@ -302,6 +336,7 @@ const StorePage = () => {
                                     <Text style={styles.discountText}>-{item.discount}%</Text>
                                 </View>
                                 <Text style={styles.nmName} numberOfLines={1}>{item.name}</Text>
+                                <Text style={styles.nmPrice}>{item.price ? `${item.price} VP` : 'N/A'}</Text>
                             </View>
                         ))}
                     </View>
@@ -390,6 +425,33 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 16,
     },
+    walletRow: {
+        flexDirection: 'row',
+        gap: 10,
+        marginBottom: 12,
+    },
+    walletPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#1C2935',
+        borderWidth: 1,
+        borderColor: '#2D3945',
+        borderRadius: 999,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+    },
+    walletLabel: {
+        color: Colors.dark.accent,
+        fontSize: 11,
+        marginRight: 8,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+    },
+    walletValue: {
+        color: Colors.dark.text,
+        fontSize: 12,
+        fontWeight: '800',
+    },
     sectionTitle: {
         color: Colors.dark.text,
         fontSize: 18,
@@ -452,6 +514,12 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: 'bold',
     },
+    priceText: {
+        color: Colors.dark.accent,
+        fontSize: 12,
+        marginTop: 4,
+        fontWeight: '700',
+    },
     nightMarketGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
@@ -476,6 +544,12 @@ const styles = StyleSheet.create({
         color: Colors.dark.text,
         fontSize: 10,
         marginTop: 8,
+    },
+    nmPrice: {
+        color: Colors.dark.accent,
+        fontSize: 10,
+        marginTop: 2,
+        fontWeight: '700',
     },
     discountBadge: {
         position: 'absolute',
