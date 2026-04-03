@@ -13,8 +13,43 @@ interface CachedMatchData {
     data: any;
 }
 
+interface CachedApiData<T> {
+    timestamp: number;
+    data: T;
+}
+
+type Region = {
+    pas_region: string;
+    pas_affinity: string;
+};
+
+type Entitlement = {
+    TypeID: string;
+    ItemID: string;
+    InstanceID?: string;
+};
+
+type InventoryResponse = {
+    Entitlements: Entitlement[];
+};
+
+type StorefrontAvailabilityResponse = {
+    data: any;
+    isAvailable: boolean;
+    reason?: string;
+    message?: string;
+};
+
+type MatchHistoryResponse = {
+    History: any[];
+};
+
 const matchDetailsCache = new Map<string, CachedMatchData>();
 const MATCH_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const storefrontCache = new Map<string, CachedApiData<StorefrontAvailabilityResponse>>();
+const inventoryCache = new Map<string, CachedApiData<InventoryResponse>>();
+const matchHistoryCache = new Map<string, CachedApiData<MatchHistoryResponse>>();
+const API_CACHE_DURATION = 2 * 60 * 1000; // 2 minutes
 
 const getCacheKey = (puuid: string, matchId: string): string => `${puuid}:${matchId}`;
 
@@ -39,6 +74,29 @@ const setCachedMatchDetails = (cacheKey: string, data: any): void => {
 const clearMatchCache = (): void => {
     matchDetailsCache.clear();
     console.log('[Cache] 🗑️  Match details cache cleared');
+};
+
+const getApiCacheKey = (region: string, puuid: string) => `${region}:${puuid}`;
+
+const getCachedApiData = <T>(cache: Map<string, CachedApiData<T>>, key: string): T | null => {
+    const cached = cache.get(key);
+    if (cached && Date.now() - cached.timestamp < API_CACHE_DURATION) {
+        return cached.data;
+    }
+    if (cached) {
+        cache.delete(key);
+    }
+    return null;
+};
+
+const setCachedApiData = <T>(cache: Map<string, CachedApiData<T>>, key: string, data: T): void => {
+    cache.set(key, { timestamp: Date.now(), data });
+};
+
+export const clearApiDataCache = (): void => {
+    storefrontCache.clear();
+    inventoryCache.clear();
+    matchHistoryCache.clear();
 };
 
 const getRiotHeaders = async () => {
@@ -82,9 +140,9 @@ export const getPlayerData = async () => {
             headers: { 'Authorization': `Bearer ${accessToken}` },
         });
         const info = await infoRes.json();
-        return { info, region: { pas_region: 'ap', pas_affinity: 'AP' } };
+        return { info, region: { pas_region: 'ap', pas_affinity: 'AP' } as Region };
     } catch (e) {
-        return { info: null, region: { pas_region: 'ap', pas_affinity: 'AP' } };
+        return { info: null, region: { pas_region: 'ap', pas_affinity: 'AP' } as Region };
     }
 };
 
@@ -234,10 +292,18 @@ const fetchWithShardFallback = async (puuid: string, path: string, method: strin
     );
 };
 
-export const fetchStorefront = async (region: string, puuid: string) => {
+export const fetchStorefront = async (region: string, puuid: string, forceRefresh: boolean = false) => {
+    const cacheKey = getApiCacheKey(region, puuid);
+    if (!forceRefresh) {
+        const cached = getCachedApiData(storefrontCache, cacheKey);
+        if (cached) return cached;
+    }
+
     try {
         const data = await fetchWithShardFallback(puuid, `/store/v3/storefront/${puuid}`, 'POST');
-        return { data, isAvailable: true };
+        const payload: StorefrontAvailabilityResponse = { data, isAvailable: true };
+        setCachedApiData(storefrontCache, cacheKey, payload);
+        return payload;
     } catch (error: any) {
         console.log('[Store] Caught error in fetchStorefront:', error.message, error.statusCode, error.errorCode);
         
@@ -245,12 +311,14 @@ export const fetchStorefront = async (region: string, puuid: string) => {
             // Handle 404 - account not eligible for store
             if (error.statusCode === 404 || error.errorCode === 'RESOURCE_NOT_FOUND') {
                 console.log('[Store] Account not eligible for store access (404)');
-                return {
+                const payload: StorefrontAvailabilityResponse = {
                     data: null,
                     isAvailable: false,
                     reason: 'UNRANKED_OR_NEW_ACCOUNT',
                     message: 'Your account will unlock the store after completing ranked placement or reaching account eligibility.'
                 };
+                setCachedApiData(storefrontCache, cacheKey, payload);
+                return payload;
             } 
             // Handle auth errors
             else if (error.statusCode === 401 || error.statusCode === 403) {
@@ -272,9 +340,59 @@ export const fetchStorefront = async (region: string, puuid: string) => {
     }
 };
 
-export const fetchInventory = async (region: string, puuid: string) => {
+export const fetchInventory = async (region: string, puuid: string, forceRefresh: boolean = false) => {
+    const SKINS_ITEM_TYPE_ID = 'e7c63390-eda7-46e0-bb7a-a6abdacd2433';
+    const cacheKey = getApiCacheKey(region, puuid);
+
+    if (!forceRefresh) {
+        const cached = getCachedApiData(inventoryCache, cacheKey);
+        if (cached) return cached;
+    }
+
+    const normalizeInventoryResponse = (data: any) => {
+        if (Array.isArray(data?.Entitlements)) {
+            return { Entitlements: data.Entitlements };
+        }
+
+        if (Array.isArray(data?.EntitlementsByTypes)) {
+            const skinEntitlementsByType = data.EntitlementsByTypes.find((entry: any) =>
+                String(entry?.ItemTypeID || '').toLowerCase() === SKINS_ITEM_TYPE_ID
+            );
+            return { Entitlements: skinEntitlementsByType?.Entitlements || [] };
+        }
+
+        return null;
+    };
+
     try {
-        return await fetchWithShardFallback(puuid, `/store/v1/entitlements/${puuid}/skin_level`);
+        // Preferred endpoint from current docs: /store/v1/entitlements/{puuid}/{ItemTypeID}
+        try {
+            const ownedItemsResponse = await fetchWithShardFallback(
+                puuid,
+                `/store/v1/entitlements/${puuid}/${SKINS_ITEM_TYPE_ID}`
+            );
+            const normalizedOwnedItems = normalizeInventoryResponse(ownedItemsResponse);
+            if (normalizedOwnedItems) {
+                setCachedApiData(inventoryCache, cacheKey, normalizedOwnedItems);
+                return normalizedOwnedItems;
+            }
+            console.log('[Inventory] Unexpected owned-items response shape; trying legacy endpoint');
+        } catch (ownedItemsError: any) {
+            if (
+                ownedItemsError?.statusCode === 401 ||
+                ownedItemsError?.statusCode === 403 ||
+                ownedItemsError?.errorCode === 'AUTH_FAILED'
+            ) {
+                throw ownedItemsError;
+            }
+            console.log('[Inventory] Owned-items endpoint failed, trying legacy skin_level endpoint');
+        }
+
+        const legacyResponse = await fetchWithShardFallback(puuid, `/store/v1/entitlements/${puuid}/skin_level`);
+        const normalizedLegacyResponse = normalizeInventoryResponse(legacyResponse);
+        const payload = normalizedLegacyResponse || { Entitlements: [] };
+        setCachedApiData(inventoryCache, cacheKey, payload);
+        return payload;
     } catch (error: any) {
         console.log('[Inventory] Error:', error.message, error.statusCode, error.errorCode);
         
@@ -282,7 +400,9 @@ export const fetchInventory = async (region: string, puuid: string) => {
             // 404 means no inventory (new account), return empty
             if (error.statusCode === 404 || error.errorCode === 'RESOURCE_NOT_FOUND') {
                 console.log('[Inventory] Account data not found - account may not have any skins');
-                return { Entitlements: [] }; // Return proper structure
+                const payload = { Entitlements: [] };
+                setCachedApiData(inventoryCache, cacheKey, payload);
+                return payload; // Return proper structure
             } 
             // Auth errors should be thrown
             else if (error.statusCode === 401 || error.statusCode === 403) {
@@ -296,7 +416,9 @@ export const fetchInventory = async (region: string, puuid: string) => {
         
         // Any other error - return empty inventory to be safe
         console.log('[Inventory] Returning empty inventory due to error');
-        return { Entitlements: [] };
+        const payload = { Entitlements: [] };
+        setCachedApiData(inventoryCache, cacheKey, payload);
+        return payload;
     }
 };
 
@@ -338,13 +460,21 @@ export const fetchCompetitiveHistory = async (region: string, puuid: string) => 
 };
 
 // NEW: Fetch match history
-export const fetchMatchHistory = async (region: string, puuid: string) => {
+export const fetchMatchHistory = async (region: string, puuid: string, forceRefresh: boolean = false) => {
+    const cacheKey = getApiCacheKey(region, puuid);
+    if (!forceRefresh) {
+        const cached = getCachedApiData(matchHistoryCache, cacheKey);
+        if (cached) return cached;
+    }
+
     try {
         console.log('[MatchHistory] Fetching match history for', puuid.substring(0, 8));
-        return await fetchWithShardFallback(
+        const payload = await fetchWithShardFallback(
             puuid,
             `/match-history/v1/history/${puuid}?begin=0&end=20`
         );
+        setCachedApiData(matchHistoryCache, cacheKey, payload);
+        return payload;
     } catch (error: any) {
         if (error instanceof APIError) {
             if (error.statusCode === 401 || error.statusCode === 403) {
@@ -356,7 +486,9 @@ export const fetchMatchHistory = async (region: string, puuid: string) => {
         }
         // Return empty history on any error
         console.log('[MatchHistory] Failed to fetch:', error.message);
-        return { History: [] };
+        const payload = { History: [] };
+        setCachedApiData(matchHistoryCache, cacheKey, payload);
+        return payload;
     }
 };
 

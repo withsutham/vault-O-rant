@@ -334,18 +334,7 @@ const MatchItem = ({ agent, result, score, map, date }: { agent: string; result:
 
 ### New Files Created
 
-#### File: `DIAGNOSTICS.md`
-- Comprehensive diagnostic guide
-- Account status checking instructions
-- FAQ section
-- Technical details for developers
-
-#### File: `FIX_SUMMARY.md`
-- Executive summary of all changes
-- What was fixed and why
-- Root cause analysis
-- Next steps for users
-- Testing checklist
+Legacy troubleshooting docs were created during earlier debugging work and later removed as part of repository cleanup.
 
 ---
 
@@ -396,9 +385,5 @@ All changes are fully backward compatible:
 
 ## Documentation Added
 
-1. **DIAGNOSTICS.md** - User-facing troubleshooting guide
-2. **FIX_SUMMARY.md** - Developer-facing comprehensive summary
-3. Inline code comments where needed
-4. This CHANGELOG.md file
-
-Total new documentation: ~500 lines
+1. Inline code comments where needed
+2. This `CHANGELOG.md` file
