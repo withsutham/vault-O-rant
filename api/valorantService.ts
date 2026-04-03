@@ -422,9 +422,39 @@ export const fetchInventory = async (region: string, puuid: string, forceRefresh
     }
 };
 
+export const fetchWallet = async (region: string, puuid: string) => {
+    try {
+        return await fetchWithShardFallback(puuid, `/store/v1/wallet/${puuid}`);
+    } catch (error: any) {
+        if (error instanceof APIError) {
+            if (error.statusCode === 401 || error.statusCode === 403) {
+                throw {
+                    message: 'AUTH_ERROR',
+                    friendlyMessage: 'Your session has expired. Please sign in again.',
+                    isAuthError: true,
+                };
+            }
+        }
+        return { Balances: {} };
+    }
+};
+
 export const fetchPlayerMMR = async (region: string, puuid: string) => {
     try {
-        return await fetchWithShardFallback(puuid, `/mmr/v1/player/${puuid}`);
+        // Preferred endpoint from current docs: /mmr/v1/players/{puuid}
+        try {
+            return await fetchWithShardFallback(puuid, `/mmr/v1/players/${puuid}`);
+        } catch (primaryError: any) {
+            // Keep backward compatibility in case singular path still works for some shards
+            if (
+                primaryError instanceof APIError &&
+                primaryError.statusCode !== 404 &&
+                primaryError.statusCode !== 400
+            ) {
+                throw primaryError;
+            }
+            return await fetchWithShardFallback(puuid, `/mmr/v1/player/${puuid}`);
+        }
     } catch (error: any) {
         if (error instanceof APIError) {
             if (error.errorCode === 'RESOURCE_NOT_FOUND') {
@@ -489,6 +519,27 @@ export const fetchMatchHistory = async (region: string, puuid: string, forceRefr
         const payload = { History: [] };
         setCachedApiData(matchHistoryCache, cacheKey, payload);
         return payload;
+    }
+};
+
+export const fetchPlayerLoadout = async (region: string, puuid: string) => {
+    try {
+        return await fetchWithShardFallback(
+            puuid,
+            `/personalization/v2/players/${puuid}/playerloadout`
+        );
+    } catch (error: any) {
+        if (error instanceof APIError) {
+            if (error.statusCode === 401 || error.statusCode === 403) {
+                throw {
+                    message: 'AUTH_ERROR',
+                    friendlyMessage: 'Your session has expired. Please sign in again.',
+                    isAuthError: true,
+                };
+            }
+        }
+
+        return null;
     }
 };
 
