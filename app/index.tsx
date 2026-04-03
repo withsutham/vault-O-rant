@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     logo: {
-        fontSize: 48,
+        fontSize: 36,
         fontWeight: '900',
         color: Colors.dark.tint,
         letterSpacing: 2,

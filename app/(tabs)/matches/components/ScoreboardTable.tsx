@@ -9,12 +9,6 @@ interface ScoreboardTableProps {
 }
 
 export const ScoreboardTable: React.FC<ScoreboardTableProps> = ({ userTeam, enemyTeam, agents }) => {
-    // Debug: log player structure
-    if (userTeam.length > 0) {
-        console.log('ScoreboardTable - Player keys available:', Object.keys(userTeam[0]));
-    }
-
-    // Try to find the name field - it might be under different names
     const getPlayerName = (player: any): string => {
         return player.gameName || player.name || player.game_name || 'Player';
     };

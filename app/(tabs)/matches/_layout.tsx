@@ -21,8 +21,8 @@ const StackLayout = () => {
       <Stack.Screen
         name="index"
         options={{
-          headerTitle: "",
-          headerShown: false
+          headerTitle: "Match History",
+          headerShown: false,
         }}
       />
       <Stack.Screen
