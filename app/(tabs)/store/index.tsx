@@ -1,33 +1,45 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Image, ScrollView, ActivityIndicator, RefreshControl, Pressable } from "react-native"
+import { useRouter } from 'expo-router';
 import Colors from "../../../constants/Colors"
 import { getPlayerData, fetchStorefront } from "../../../api/valorantService"
 import { getAllSkins } from "../../../api/mappingService"
+import { normalizeAppError } from '../../../utils/appErrors';
+import { trackEvent } from '../../../utils/analytics';
 
 const StorePage = () => {
+    const router = useRouter();
     const [offers, setOffers] = useState<any[]>([]);
     const [nightMarket, setNightMarket] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [guest, setGuest] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isAuthError, setIsAuthError] = useState(false);
     const [storeUnavailable, setStoreUnavailable] = useState<{ reason: string; message: string } | null>(null);
+    const [debugInfo, setDebugInfo] = useState<string | null>(null);
+    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-    const loadStoreData = async () => {
+    const loadStoreData = async (forceRefresh: boolean = false) => {
         try {
             setError(null);
+            setIsAuthError(false);
             setStoreUnavailable(null);
+            setDebugInfo(null);
             setLoading(true);
             const { info, region } = await getPlayerData();
             
             if (!info) {
                 setGuest(true);
+                if (__DEV__) {
+                    setDebugInfo('debug: guest mode (missing player info/token)');
+                }
                 return;
             }
 
             setGuest(false);
             const activeRegion = region?.pas_region || 'ap';
-            const storefrontResponse = await fetchStorefront(activeRegion, info.sub);
+            const storefrontResponse = await fetchStorefront(activeRegion, info.sub, forceRefresh);
 
             // Check if store is available
             if (!storefrontResponse.isAvailable) {
@@ -35,6 +47,11 @@ const StorePage = () => {
                     reason: storefrontResponse.reason || 'UNKNOWN',
                     message: storefrontResponse.message || 'Store data is not available for your account.'
                 });
+                if (__DEV__) {
+                    setDebugInfo(`debug: store unavailable (reason=${storefrontResponse.reason || 'UNKNOWN'})`);
+                }
+                trackEvent('store_load_success', { isAvailable: false, reason: storefrontResponse.reason || 'UNKNOWN' });
+                setLastUpdated(new Date());
                 return;
             }
 
@@ -61,6 +78,11 @@ const StorePage = () => {
                 });
 
                 setOffers(mappedOffers);
+                setLastUpdated(new Date());
+                trackEvent('store_load_success', { isAvailable: true, dailyOffers: mappedOffers.length });
+                if (__DEV__) {
+                    setDebugInfo(`debug: store ok (dailyOffers=${mappedOffers.length})`);
+                }
                 
                 if (storefront.BonusStore) {
                     const mappedBonus = storefront.BonusStore.BonusStoreOffers.map((offer: any) => {
@@ -81,9 +103,20 @@ const StorePage = () => {
                         return skinMatch;
                     }).filter((s: any) => s !== null);
                     setNightMarket(mappedBonus);
+                    trackEvent('store_load_success', {
+                        isAvailable: true,
+                        dailyOffers: mappedOffers.length,
+                        nightMarket: mappedBonus.length,
+                    });
+                    if (__DEV__) {
+                        setDebugInfo(`debug: store ok (dailyOffers=${mappedOffers.length}, nightMarket=${mappedBonus.length})`);
+                    }
                 }
             } else {
                 setError('No storefront data found.');
+                if (__DEV__) {
+                    setDebugInfo('debug: missing storefront or mapping data');
+                }
             }
         } catch (err: any) {
             console.error('Store Load Error:', err);
@@ -95,6 +128,16 @@ const StorePage = () => {
                 name: err.name
             });
             
+            const normalizedError = normalizeAppError(err, 'Failed to connect to Riot servers.');
+            setIsAuthError(normalizedError.isAuthError);
+            trackEvent('store_load_failed', { source: normalizedError.source, message: normalizedError.message });
+
+            if (__DEV__) {
+                const source = normalizedError.source;
+                const message = String(err?.message || 'unknown').slice(0, 140);
+                setDebugInfo(`debug: source=${source} message=${message}`);
+            }
+
             // Handle APIError exceptions
             if (err.name === 'APIError') {
                 if (err.statusCode === 404) {
@@ -104,7 +147,7 @@ const StorePage = () => {
                     });
                     return;
                 } else if (err.statusCode === 401 || err.statusCode === 403) {
-                    setError('Your session has expired. Please sign in again.');
+                    setError(normalizedError.message);
                     return;
                 } else {
                     setError(`Store error: ${err.message}`);
@@ -115,12 +158,12 @@ const StorePage = () => {
             // Handle specific error types
             if (err.message === 'STORE_DATA_NOT_FOUND' || err.isAccountIneligible) {
                 setError('Your account is not yet eligible to view the store. New accounts or accounts in certain regions may have restrictions.');
-            } else if (err.message === 'AUTH_ERROR' || err.isAuthError) {
-                setError('Your session has expired. Please sign in again.');
+            } else if (normalizedError.isAuthError) {
+                setError(normalizedError.message);
             } else if (err.message === 'ACCOUNT_DATA_NOT_FOUND') {
                 setError('Store data not available for your account. Your account may need to complete placement matches.');
             } else {
-                setError(err.friendlyMessage || err.message || 'Failed to connect to Riot servers.');
+                setError(normalizedError.message);
             }
         } finally {
             setLoading(false);
@@ -134,21 +177,42 @@ const StorePage = () => {
 
     const onRefresh = () => {
         setRefreshing(true);
-        loadStoreData();
+        loadStoreData(true);
     };
 
     if (loading && !refreshing) {
+        const skeletonCards = Array.from({ length: 4 });
         return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={Colors.dark.tint} />
-                <Text style={styles.loadingText}>Fetching your daily deals...</Text>
-            </View>
+            <ScrollView style={styles.container}>
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Daily Offers</Text>
+                </View>
+                <View style={styles.grid}>
+                    {skeletonCards.map((_, index) => (
+                        <View key={`store-skeleton-${index}`} style={styles.storeItem}>
+                            <View style={[styles.skinImageContainer, styles.skeletonBlock]} />
+                            <View style={styles.skinInfo}>
+                                <View style={styles.skeletonLine} />
+                            </View>
+                        </View>
+                    ))}
+                </View>
+                <View style={styles.loadingInline}>
+                    <ActivityIndicator size="small" color={Colors.dark.tint} />
+                    <Text style={styles.loadingText}>Fetching your daily deals...</Text>
+                </View>
+            </ScrollView>
         );
     }
 
     if (guest) {
         return (
             <View style={styles.guestContainer}>
+                {__DEV__ && debugInfo ? (
+                    <View style={styles.debugBanner}>
+                        <Text style={styles.debugText}>{debugInfo}</Text>
+                    </View>
+                ) : null}
                 <Text style={styles.guestText}>Please sign in with Riot to see your live store.</Text>
             </View>
         );
@@ -157,8 +221,18 @@ const StorePage = () => {
     if (error) {
         return (
             <View style={styles.guestContainer}>
+                {__DEV__ && debugInfo ? (
+                    <View style={styles.debugBanner}>
+                        <Text style={styles.debugText}>{debugInfo}</Text>
+                    </View>
+                ) : null}
                 <Text style={styles.errorTitle}>ACCESS DENIED</Text>
                 <Text style={styles.errorText}>{error}</Text>
+                {isAuthError ? (
+                    <Pressable style={styles.retryButton} onPress={() => router.push('/login')}>
+                        <Text style={styles.retryText}>Sign In Again</Text>
+                    </Pressable>
+                ) : null}
                 <Pressable style={styles.retryButton} onPress={onRefresh}>
                     <Text style={styles.retryText}>Retry Connection</Text>
                 </Pressable>
@@ -169,6 +243,11 @@ const StorePage = () => {
     if (storeUnavailable) {
         return (
             <View style={styles.guestContainer}>
+                {__DEV__ && debugInfo ? (
+                    <View style={styles.debugBanner}>
+                        <Text style={styles.debugText}>{debugInfo}</Text>
+                    </View>
+                ) : null}
                 <Text style={styles.unavailableTitle}>STORE LOCKED</Text>
                 <Text style={styles.unavailableMessage}>{storeUnavailable.message}</Text>
                 <Pressable style={styles.retryButton} onPress={onRefresh}>
@@ -183,9 +262,15 @@ const StorePage = () => {
             style={styles.container}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.dark.tint} />}
         >
+            {__DEV__ && debugInfo ? (
+                <View style={styles.debugBanner}>
+                    <Text style={styles.debugText}>{debugInfo}</Text>
+                </View>
+            ) : null}
             <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Daily Offers</Text>
             </View>
+            <Text style={styles.updatedAt}>Last updated {lastUpdated ? lastUpdated.toLocaleTimeString() : 'just now'}</Text>
 
             <View style={styles.grid}>
                 {offers.map((item, index) => (
@@ -241,8 +326,13 @@ const styles = StyleSheet.create({
     },
     loadingText: {
         color: Colors.dark.text,
-        marginTop: 15,
+        marginTop: 4,
         opacity: 0.7,
+    },
+    loadingInline: {
+        marginTop: 8,
+        marginBottom: 16,
+        alignItems: 'center',
     },
     guestContainer: {
         flex: 1,
@@ -270,6 +360,19 @@ const styles = StyleSheet.create({
         opacity: 0.5,
         marginBottom: 30,
     },
+    debugBanner: {
+        backgroundColor: '#22303D',
+        borderColor: '#3D5163',
+        borderWidth: 1,
+        borderRadius: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        marginBottom: 12,
+    },
+    debugText: {
+        color: '#9FC4E0',
+        fontSize: 11,
+    },
     retryButton: {
         paddingHorizontal: 24,
         paddingVertical: 12,
@@ -293,6 +396,11 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         textTransform: 'uppercase',
         letterSpacing: 1,
+    },
+    updatedAt: {
+        color: Colors.dark.tabIconDefault,
+        fontSize: 11,
+        marginBottom: 10,
     },
     grid: {
         flexDirection: 'row',
@@ -324,6 +432,15 @@ const styles = StyleSheet.create({
         width: '100%',
         height: '100%',
         backgroundColor: '#1C2935',
+    },
+    skeletonBlock: {
+        backgroundColor: '#22303D',
+    },
+    skeletonLine: {
+        width: '80%',
+        height: 10,
+        borderRadius: 4,
+        backgroundColor: '#22303D',
     },
     skinInfo: {
         padding: 12,

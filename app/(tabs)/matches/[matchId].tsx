@@ -8,7 +8,6 @@ import { getPlayerData } from '../../../api/valorantService';
 import { MatchHeaderSection } from './components/MatchHeaderSection';
 import { PlayerStatsCard } from './components/PlayerStatsCard';
 import { ScoreboardTable } from './components/ScoreboardTable';
-import { debugLog } from '../../../utils/logger';
 
 const MatchDetailScreen = () => {
     const router = useRouter();
@@ -61,24 +60,6 @@ const MatchDetailScreen = () => {
                     return;
                 }
 
-                console.log('Match Details:', JSON.stringify(details, null, 2));
-                console.log('Players:', details.players);
-                console.log('MatchInfo:', details.matchInfo);
-                
-                // Log first player to see structure
-                if (details.players && details.players.length > 0) {
-                    console.log('First player structure:', JSON.stringify(details.players[0], null, 2));
-                    console.log('First player stats:', JSON.stringify(details.players[0].stats, null, 2));
-                }
-
-                debugLog('Match Details loaded', details);
-                debugLog('Players array', details.players);
-                debugLog('MatchInfo', details.matchInfo);
-                if (details.players && details.players.length > 0) {
-                    debugLog('First player structure', details.players[0]);
-                    debugLog('First player stats', details.players[0].stats);
-                }
-
                 setMatchDetails(details);
             } catch (err: any) {
                 console.error('Error loading match details:', err);
@@ -112,26 +93,11 @@ const MatchDetailScreen = () => {
     }
 
     const playerInfo = matchDetails.players?.find((p: any) => p.subject === playerUUID);
-    debugLog('==== MATCH DETAIL DEBUG START ====');
-    debugLog('Player Info found', !!playerInfo);
-    debugLog('Player Info keys', playerInfo ? Object.keys(playerInfo) : 'N/A');
-    if (playerInfo?.stats) {
-        debugLog('Player Stats keys', Object.keys(playerInfo.stats));
-        debugLog('Player Stats values', playerInfo.stats);
-    }
     
     const { userTeam, enemyTeam, playerTeamId } = getScoreboard(matchDetails, playerUUID);
-    debugLog('User Team length', userTeam.length);
-    debugLog('Enemy Team length', enemyTeam.length);
-    if (userTeam.length > 0) {
-        debugLog('First user team player keys', Object.keys(userTeam[0]));
-        debugLog('First user team player full data', userTeam[0]);
-    }
     
     const mapId = matchDetails.matchInfo?.mapId;
     const normalizedMapId = mapId ? String(mapId).toLowerCase() : '';
-    debugLog('Map ID from matchInfo', mapId);
-    debugLog('Available maps in map', Array.from(maps.keys()));
     
     // Try to find the map - mapId should match mapUrl
     let mapData = maps.get(normalizedMapId);
@@ -150,14 +116,8 @@ const MatchDetailScreen = () => {
             }
         }
     }
-    debugLog('Map Data found', !!mapData);
-    if (mapData) {
-        debugLog('Map Data', mapData);
-    }
     
     const mapName = mapData?.displayName || normalizedMapId.split('/').pop() || 'Unknown Map';
-    debugLog('Final Map Name', mapName);
-    debugLog('==== MATCH DETAIL DEBUG END ====');
 
     return (
         <ScrollView

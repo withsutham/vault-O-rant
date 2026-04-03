@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, Pressable, Image } from "react-native"
 import { useRouter } from "expo-router"
 import Colors from "../../../constants/Colors"
-import { getPlayerData, fetchMatchHistory, fetchMatchDetailsWithCache, clearMatchDetailsCache, formatMatchDate, getQueueName } from "../../../api/valorantService"
+import { getPlayerData, fetchMatchHistory, fetchMatchDetailsWithCache, clearMatchDetailsCache, clearApiDataCache, formatMatchDate, getQueueName } from "../../../api/valorantService"
 import { getAgents, getMaps } from "../../../api/mappingService"
+import { normalizeAppError } from '../../../utils/appErrors';
+import { trackEvent } from '../../../utils/analytics';
 
 const MatchItem = ({ 
     id,
@@ -108,21 +110,28 @@ const MatchesPage = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [guest, setGuest] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isAuthError, setIsAuthError] = useState(false);
     const [stats, setStats] = useState<{ wins: number; losses: number; winRate: string; mostPlayedAgent: string } | null>(null);
+    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
     const router = useRouter();
 
     const handleMatchPress = (matchId: string) => {
+        trackEvent('match_opened', { matchId: matchId.slice(0, 8) });
         router.push(`/matches/${matchId}`);
     };
 
-    const loadMatchHistory = async () => {
+    const loadMatchHistory = async (forceRefresh: boolean = false) => {
         try {
             setError(null);
+            setIsAuthError(false);
             setLoading(true);
             setDisplayedCount(5); // Reset to show first 5
             
             // Clear cache on manual refresh to get fresh data
-            clearMatchDetailsCache();
+            if (forceRefresh) {
+                clearMatchDetailsCache();
+                clearApiDataCache();
+            }
             
             const { info, region } = await getPlayerData();
             
@@ -133,7 +142,7 @@ const MatchesPage = () => {
 
             setGuest(false);
             const activeRegion = region?.pas_region || 'ap';
-            const historyData = await fetchMatchHistory(activeRegion, info.sub);
+            const historyData = await fetchMatchHistory(activeRegion, info.sub, forceRefresh);
 
             if (historyData && historyData.History && historyData.History.length > 0) {
                 const agentsData = await getAgents();
@@ -220,19 +229,21 @@ const MatchesPage = () => {
                 // Calculate stats
                 const stats = calculateStats(transformedMatches);
                 setStats(stats);
+                setLastUpdated(new Date());
+                trackEvent('matches_load_success', { total: transformedMatches.length });
             } else {
                 setAllHistoryMatches([]);
                 setMatches([]);
                 setStats(null);
+                setLastUpdated(new Date());
+                trackEvent('matches_load_success', { total: 0 });
             }
         } catch (err: any) {
             console.error('Match History Load Error:', err);
-            
-            if (err.message === 'AUTH_ERROR' || err.isAuthError) {
-                setError('Your session has expired. Please sign in again.');
-            } else {
-                setError(err.friendlyMessage || err.message || 'Failed to load match history.');
-            }
+            const normalizedError = normalizeAppError(err, 'Failed to load match history.');
+            setIsAuthError(normalizedError.isAuthError);
+            setError(normalizedError.message);
+            trackEvent('matches_load_failed', { source: normalizedError.source, message: normalizedError.message });
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -246,14 +257,33 @@ const MatchesPage = () => {
 
     const onRefresh = () => {
         setRefreshing(true);
-        loadMatchHistory();
+        loadMatchHistory(true);
     };
 
     if (loading && !refreshing) {
+        const skeletonRows = Array.from({ length: 5 });
         return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={Colors.dark.tint} />
-                <Text style={styles.loadingText}>Loading your match history...</Text>
+            <View style={styles.container}>
+                <View style={styles.listContainer}>
+                    <View style={styles.statsHeader}>
+                        <View style={styles.statItem}><View style={styles.skeletonLineWide} /></View>
+                        <View style={styles.statItem}><View style={styles.skeletonLineWide} /></View>
+                        <View style={styles.statItem}><View style={styles.skeletonLineWide} /></View>
+                    </View>
+                    {skeletonRows.map((_, index) => (
+                        <View key={`match-skeleton-${index}`} style={styles.matchItem}>
+                            <View style={[styles.agentPlaceholder, styles.skeletonBlock]} />
+                            <View style={{ flex: 1 }}>
+                                <View style={styles.skeletonLine} />
+                                <View style={[styles.skeletonLine, { width: '55%', marginTop: 8 }]} />
+                            </View>
+                        </View>
+                    ))}
+                    <View style={styles.loadingInline}>
+                        <ActivityIndicator size="small" color={Colors.dark.tint} />
+                        <Text style={styles.loadingText}>Loading your match history...</Text>
+                    </View>
+                </View>
             </View>
         );
     }
@@ -272,6 +302,11 @@ const MatchesPage = () => {
             <View style={styles.emptyContainer}>
                 <Text style={styles.errorTitle}>Error</Text>
                 <Text style={styles.errorMessage}>{error}</Text>
+                {isAuthError ? (
+                    <Pressable style={styles.retryButton} onPress={() => router.push('/login')}>
+                        <Text style={styles.retryText}>Sign In Again</Text>
+                    </Pressable>
+                ) : null}
                 <Pressable style={styles.retryButton} onPress={onRefresh}>
                     <Text style={styles.retryText}>Retry</Text>
                 </Pressable>
@@ -300,20 +335,23 @@ const MatchesPage = () => {
                 contentContainerStyle={styles.listContainer}
                 ListHeaderComponent={<StatsHeader stats={stats} />}
                 ListFooterComponent={
-                    allHistoryMatches.length > displayedCount ? (
-                        <Pressable 
-                            style={styles.loadMoreButton}
-                            onPress={() => {
-                                const newCount = Math.min(displayedCount + 5, allHistoryMatches.length);
-                                setDisplayedCount(newCount);
-                                setMatches(allHistoryMatches.slice(0, newCount));
-                            }}
-                        >
-                            <Text style={styles.loadMoreText}>
-                                Load More ({displayedCount}/{allHistoryMatches.length})
-                            </Text>
-                        </Pressable>
-                    ) : null
+                    <View>
+                        {allHistoryMatches.length > displayedCount ? (
+                            <Pressable 
+                                style={styles.loadMoreButton}
+                                onPress={() => {
+                                    const newCount = Math.min(displayedCount + 5, allHistoryMatches.length);
+                                    setDisplayedCount(newCount);
+                                    setMatches(allHistoryMatches.slice(0, newCount));
+                                }}
+                            >
+                                <Text style={styles.loadMoreText}>
+                                    Load More ({displayedCount}/{allHistoryMatches.length})
+                                </Text>
+                            </Pressable>
+                        ) : null}
+                        <Text style={styles.updatedAt}>Last updated {lastUpdated ? lastUpdated.toLocaleTimeString() : 'just now'}</Text>
+                    </View>
                 }
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.dark.tint} />}
             />
@@ -337,8 +375,12 @@ const styles = StyleSheet.create({
     },
     loadingText: {
         color: Colors.dark.text,
-        marginTop: 15,
+        marginTop: 4,
         opacity: 0.7,
+    },
+    loadingInline: {
+        marginTop: 8,
+        alignItems: 'center',
     },
     emptyContainer: {
         flex: 1,
@@ -490,10 +532,31 @@ const styles = StyleSheet.create({
          borderColor: Colors.dark.tint,
      },
      loadMoreText: {
-         color: Colors.dark.tint,
-         fontSize: 14,
-         fontWeight: '600',
-     },
- })
+          color: Colors.dark.tint,
+          fontSize: 14,
+          fontWeight: '600',
+      },
+      updatedAt: {
+          color: Colors.dark.tabIconDefault,
+          fontSize: 11,
+          marginTop: 12,
+          textAlign: 'center',
+      },
+      skeletonBlock: {
+          backgroundColor: '#22303D',
+      },
+      skeletonLine: {
+          width: '70%',
+          height: 10,
+          borderRadius: 4,
+          backgroundColor: '#22303D',
+      },
+      skeletonLineWide: {
+          width: 70,
+          height: 10,
+          borderRadius: 4,
+          backgroundColor: '#22303D',
+      },
+  })
 
 export default MatchesPage
