@@ -40,8 +40,10 @@ const InventoryPage = () => {
 
             setGuest(false);
             const activeRegion = region?.pas_region || 'ap';
-            const inventory = await fetchInventory(activeRegion, info.sub, forceRefresh);
-            const allSkins = await getAllSkins();
+            const [inventory, allSkins] = await Promise.all([
+                fetchInventory(activeRegion, info.sub, forceRefresh),
+                getAllSkins(),
+            ]);
 
             if (inventory && inventory.Entitlements && allSkins && allSkins.length > 0) {
                 const ownedUuids = new Set(
