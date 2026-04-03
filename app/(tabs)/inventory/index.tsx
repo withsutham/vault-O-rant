@@ -15,26 +15,18 @@ const InventoryPage = () => {
     const [guest, setGuest] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isAuthError, setIsAuthError] = useState(false);
-    const [debugInfo, setDebugInfo] = useState<string | null>(null);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
     const loadInventoryData = async (forceRefresh: boolean = false) => {
         try {
-            console.log('--- Inventory: Loading Data ---');
             setError(null);
             setIsAuthError(false);
-            setDebugInfo(null);
             setLoading(true);
             const { info, region } = await getPlayerData();
-            
-            console.log('Inventory Auth Status:', { hasInfo: !!info, hasRegion: !!region });
 
             if (!info) {
                 setGuest(true);
                 setSkins([]);
-                if (__DEV__) {
-                    setDebugInfo('debug: guest mode (missing player info/token)');
-                }
                 return;
             }
 
@@ -74,30 +66,17 @@ const InventoryPage = () => {
                 setSkins(mappedSkins);
                 setLastUpdated(new Date());
                 trackEvent('inventory_load_success', { entitlements: inventory.Entitlements.length, mappedSkins: mappedSkins.length });
-                if (__DEV__) {
-                    setDebugInfo(`debug: inventory ok (entitlements=${inventory.Entitlements.length}, mappedSkins=${mappedSkins.length})`);
-                }
             } else if (inventory && inventory.Entitlements && inventory.Entitlements.length === 0) {
                 // Empty inventory is valid - just no skins
                 setSkins([]);
                 setLastUpdated(new Date());
                 trackEvent('inventory_load_success', { entitlements: 0, mappedSkins: 0 });
-                if (__DEV__) {
-                    setDebugInfo('debug: inventory empty (0 entitlements)');
-                }
             }
         } catch (err: any) {
-            console.error('Inventory Load Error:', err);
             const normalizedError = normalizeAppError(err, 'Failed to load inventory. Please try again.');
             setIsAuthError(normalizedError.isAuthError);
             setError(normalizedError.message);
             trackEvent('inventory_load_failed', { source: normalizedError.source, message: normalizedError.message });
-
-            if (__DEV__) {
-                const source = normalizedError.source;
-                const message = String(err?.message || 'unknown').slice(0, 140);
-                setDebugInfo(`debug: source=${source} message=${message}`);
-            }
             setSkins([]);
         } finally {
             setLoading(false);
@@ -143,11 +122,6 @@ const InventoryPage = () => {
     if (guest) {
         return (
             <View style={styles.guestContainer}>
-                {__DEV__ && debugInfo ? (
-                    <View style={styles.debugBanner}>
-                        <Text style={styles.debugText}>{debugInfo}</Text>
-                    </View>
-                ) : null}
                 <Text style={styles.guestText}>Please sign in to view your inventory.</Text>
                 <Pressable style={styles.retryButton} onPress={onRefresh}>
                     <Text style={styles.retryText}>Retry Loading</Text>
@@ -159,11 +133,6 @@ const InventoryPage = () => {
     if (error) {
         return (
             <View style={styles.guestContainer}>
-                {__DEV__ && debugInfo ? (
-                    <View style={styles.debugBanner}>
-                        <Text style={styles.debugText}>{debugInfo}</Text>
-                    </View>
-                ) : null}
                 <Text style={styles.errorTitle}>INVENTORY ERROR</Text>
                 <Text style={styles.errorText}>{error}</Text>
                 {isAuthError ? (
@@ -183,11 +152,6 @@ const InventoryPage = () => {
             style={styles.container}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.dark.tint} />}
         >
-            {__DEV__ && debugInfo ? (
-                <View style={styles.debugBanner}>
-                    <Text style={styles.debugText}>{debugInfo}</Text>
-                </View>
-            ) : null}
             <View style={styles.header}>
                 <Text style={styles.title}>Your Collection</Text>
                 <Text style={styles.subtitle}>{skins.length} Skins Owned</Text>
@@ -269,19 +233,6 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         opacity: 0.6,
         marginBottom: 20,
-    },
-    debugBanner: {
-        backgroundColor: '#22303D',
-        borderColor: '#3D5163',
-        borderWidth: 1,
-        borderRadius: 6,
-        paddingHorizontal: 10,
-        paddingVertical: 8,
-        marginBottom: 12,
-    },
-    debugText: {
-        color: '#9FC4E0',
-        fontSize: 11,
     },
     retryButton: {
         padding: 12,

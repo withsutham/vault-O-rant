@@ -13,7 +13,6 @@ const LoginPage = () => {
     // Set up deep linking listener
     useEffect(() => {
         const subscription = Linking.addEventListener('url', ({ url }) => {
-            console.log('[DeepLink] Received URL:', url);
             if (url.includes('access_token')) {
                 handleDeepLinkUrl(url);
             }
@@ -31,11 +30,9 @@ const LoginPage = () => {
             const accessToken = params.get('access_token');
 
             if (accessToken) {
-                console.log('[DeepLink] Extracted access token, finalizing login');
                 await finalizeLogin(accessToken);
             }
         } catch (error) {
-            console.error('Deep link parsing error:', error);
             Alert.alert('Login Error', 'Failed to parse deep link.');
         }
     };
@@ -43,8 +40,6 @@ const LoginPage = () => {
     const handleNavigationStateChange = async (newNavState: any) => {
         const { url } = newNavState;
         if (!url) return;
-
-        console.log('[WebView] Navigation to:', url);
 
         // For development: also check WebView navigation in case deep linking doesn't work
         if (url.startsWith(RSO_CONFIG.REDIRECT_URI) && url.includes('access_token')) {
@@ -56,11 +51,9 @@ const LoginPage = () => {
                 const accessToken = params.get('access_token');
 
                 if (accessToken) {
-                    console.log('[WebView] Extracted access token, finalizing login');
                     await finalizeLogin(accessToken);
                 }
             } catch (error) {
-                console.error('WebView login parsing error:', error);
                 Alert.alert('Login Error', 'Failed to parse authentication data.');
             }
         }
@@ -93,15 +86,12 @@ const LoginPage = () => {
             // USE THE PUUID FROM USER_INFO BUT VERIFY IT WORKS WITH ENTITLEMENTS
             const userId = userData.sub;
 
-            console.log('[Login] Captured PUUID:', userId);
-
             // 3. Save to Secure Store
             await saveTokens(accessToken, entitlementsToken, userId);
 
             // 4. Redirect to Tabs
             router.replace('/(tabs)/profile');
         } catch (error) {
-            console.error('Finalize login error:', error);
             Alert.alert('Login Error', 'Failed to complete authentication with Riot.');
         } finally {
             setLoading(false);

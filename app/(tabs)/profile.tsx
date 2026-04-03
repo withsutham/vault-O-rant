@@ -16,13 +16,11 @@ const ProfilePage = () => {
 
     const loadData = async () => {
         try {
-            console.log('Loading Profile Data...');
             const { info, region } = await getPlayerData();
             setUserInfo(info);
             setUserRegion(region);
 
             if (info && region) {
-                console.log('Fetching MMR for:', info.sub, 'in', region.pas_region);
                 const playerMmr = await fetchPlayerMMR(region.pas_region, info.sub);
                 const tiers = await getCompetitiveTiers();
 
@@ -66,7 +64,6 @@ const ProfilePage = () => {
                     }
                 } else {
                     // Account is unranked - try to get peak rank
-                    console.log('Account is unranked - fetching competitive history for peak rank');
                     const history = await fetchCompetitiveHistory(region.pas_region, info.sub);
                     const peak = getPeakRankFromHistory(history);
                     
@@ -82,12 +79,9 @@ const ProfilePage = () => {
                     });
                 }
             } else if (!info) {
-                console.log('No user info found - user may be a guest');
                 setPlayerBanner(null);
             }
         } catch (error: any) {
-            console.error('Profile loadData error:', error);
-            
             // Handle auth errors
             if (error.message === 'AUTH_ERROR' || error.isAuthError) {
                 Alert.alert('Session Expired', 'Your session has expired. Please sign in again.');
@@ -178,7 +172,7 @@ const ProfilePage = () => {
             </View>
 
             <View style={styles.detailsCard}>
-                <Text style={styles.sectionTitle}>Debug Info</Text>
+                <Text style={styles.sectionTitle}>Session Info</Text>
                 <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Entitlements Token</Text>
                     <Text style={[styles.detailValue, { color: userInfo ? '#46FF94' : '#FF4655' }]}>
