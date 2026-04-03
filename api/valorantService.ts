@@ -56,11 +56,9 @@ const getCacheKey = (puuid: string, matchId: string): string => `${puuid}:${matc
 const getCachedMatchDetails = (cacheKey: string): any | null => {
     const cached = matchDetailsCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < MATCH_CACHE_DURATION) {
-        console.log('[Cache] ✓ Cache hit:', cacheKey.substring(0, 20));
         return cached.data;
     }
     if (cached) {
-        console.log('[Cache] ⏱️ Cache expired:', cacheKey.substring(0, 20));
         matchDetailsCache.delete(cacheKey);
     }
     return null;
@@ -68,12 +66,10 @@ const getCachedMatchDetails = (cacheKey: string): any | null => {
 
 const setCachedMatchDetails = (cacheKey: string, data: any): void => {
     matchDetailsCache.set(cacheKey, { timestamp: Date.now(), data });
-    console.log('[Cache] 💾 Cached match details for:', cacheKey.substring(0, 20));
 };
 
 const clearMatchCache = (): void => {
     matchDetailsCache.clear();
-    console.log('[Cache] 🗑️  Match details cache cleared');
 };
 
 const getApiCacheKey = (region: string, puuid: string) => `${region}:${puuid}`;
@@ -102,13 +98,7 @@ export const clearApiDataCache = (): void => {
 const getRiotHeaders = async () => {
     const version = await getClientVersion();
     const { accessToken, entitlementsToken } = await getTokens();
-    
-    // Diagnostic logging
-    console.log(`[Headers] Retrieving authentication headers...`);
-    console.log(`[Headers] Access Token Length: ${accessToken ? accessToken.length : 0} chars ${!accessToken ? '⚠️ MISSING' : '✓'}`);
-    console.log(`[Headers] Entitlements Token Length: ${entitlementsToken ? entitlementsToken.length : 0} chars ${!entitlementsToken ? '⚠️ MISSING' : '✓'}`);
-    console.log(`[Headers] Client Version: ${version}`);
-    
+
     return {
         'Authorization': `Bearer ${accessToken}`,
         'X-Riot-Entitlements-JWT': entitlementsToken || '',
@@ -163,33 +153,18 @@ const fetchWithShardFallback = async (puuid: string, path: string, method: strin
     // Validate PUUID format
     const puuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!puuidRegex.test(puuid)) {
-        console.log(`[API] ⚠️ PUUID Format Invalid: "${puuid}"`);
         throw new APIError(`Invalid PUUID format: ${puuid}`, 400);
     }
-    console.log(`[API] ✓ PUUID Format Valid: ${puuid.substring(0, 8)}...`);
     
     const headers = await getRiotHeaders();
     
     // Validate critical headers
     if (!headers.Authorization) {
-        console.log('[API] ⚠️ CRITICAL: Missing Authorization header!');
         throw new APIError('Missing Authorization header', 401);
     }
-    if (!headers['X-Riot-Entitlements-JWT']) {
-        console.log('[API] ⚠️ WARNING: Missing Entitlements Token - may cause 401 errors');
-    }
     if (!headers['X-Riot-ClientPlatform']) {
-        console.log('[API] ⚠️ CRITICAL: Missing X-Riot-ClientPlatform header - may cause 400 errors on Store/Inventory!');
         throw new APIError('Missing X-Riot-ClientPlatform header', 400);
     }
-    console.log(`[API] Request Headers Summary:`);
-    console.log(`  - Authorization: ${headers.Authorization ? 'Bearer ****' + headers.Authorization.slice(-10) : 'MISSING'}`);
-    console.log(`  - Entitlements: ${headers['X-Riot-Entitlements-JWT'] ? `JWT ****${headers['X-Riot-Entitlements-JWT'].slice(-8)}` : 'MISSING'}`);
-    console.log(`  - ClientVersion: ${headers['X-Riot-ClientVersion']}`);
-    console.log(`  - ClientPlatform: ${headers['X-Riot-ClientPlatform'] ? 'PRESENT (Base64)' : 'MISSING ⚠️'}`);
-    console.log(`  - User-Agent: ${headers['User-Agent']}`);
-    console.log(`  - Content-Type: ${headers['Content-Type']}`);
-    console.log(`[API] Request Method: ${method}`);
     
     // Try AP first (detected shard for Thailand), then fallback to others
     const shards = ['ap', 'kr', 'na', 'eu'];
@@ -198,12 +173,6 @@ const fetchWithShardFallback = async (puuid: string, path: string, method: strin
     
     for (const shard of shards) {
         const url = `https://pd.${shard}.a.pvp.net${path}`;
-        console.log(`\n[API] ======================================`);
-        console.log(`[API] Attempting Shard: ${shard.toUpperCase()}`);
-        console.log(`[API] URL: ${url}`);
-        console.log(`[API] Method: ${method}`);
-        console.log(`[API] Headers being sent:`, Object.keys(headers).length, 'headers');
-        console.log(`[API] ======================================`);
         
         try {
             const fetchOptions: any = { headers, method };
@@ -212,12 +181,8 @@ const fetchWithShardFallback = async (puuid: string, path: string, method: strin
             }
             const res = await fetchWithTimeout(url, fetchOptions, 5000);
             
-            console.log(`[API] Response Status: ${res.status} ${res.statusText}`);
-            
             if (res.ok) {
-                console.log(`[API] ✓ SUCCESS on ${shard.toUpperCase()}`);
                 const data = await res.json();
-                console.log(`[API] Response size: ${JSON.stringify(data).length} bytes`);
                 return data;
             }
             
@@ -226,8 +191,6 @@ const fetchWithShardFallback = async (puuid: string, path: string, method: strin
             let parsedError = null;
             try {
                 errorBody = await res.text();
-                console.log(`[API] ✗ Shard ${shard.toUpperCase()} failed with ${res.status}`);
-                console.log(`[API] Response body: ${errorBody}`);
                 
                 // Try to parse as JSON to get error code
                 if (errorBody) {
@@ -238,22 +201,17 @@ const fetchWithShardFallback = async (puuid: string, path: string, method: strin
                         // Not JSON, ignore
                     }
                 }
-            } catch (e) {
-                console.log(`[API] ✗ Shard ${shard.toUpperCase()} failed with ${res.status} (couldn't read body)`);
-            }
+            } catch (e) {}
             
             // Track auth errors
             if (res.status === 401 || res.status === 403) {
                 hasAuthError = true;
             }
-        } catch (e: any) {
-            console.log(`[API] ✗ Shard ${shard.toUpperCase()} error: ${e.message}`);
-        }
+        } catch (e: any) {}
     }
     
     // All shards failed - determine the type of error
     if (hasAuthError) {
-        console.log('[API] ✗ Authentication Error Detected');
         throw new APIError(
             'Authentication failed - your tokens may have expired. Please log in again.',
             401,
@@ -263,7 +221,6 @@ const fetchWithShardFallback = async (puuid: string, path: string, method: strin
     }
     
     if (lastErrorCode === 'RESOURCE_NOT_FOUND') {
-        console.log('[API] ✗ Account data not found - likely account is not ranked or ineligible');
         throw new APIError(
             'ACCOUNT_DATA_NOT_FOUND',
             404,
@@ -272,18 +229,6 @@ const fetchWithShardFallback = async (puuid: string, path: string, method: strin
         );
     }
     
-    // All shards failed - provide detailed error info
-    const errorDetails = `
-[API] ✗ FAILED TO FETCH DATA
-[API] PUUID: ${puuid.substring(0, 8)}...
-[API] Path: ${path}
-[API] All shards (AP, KR, NA, EU) returned errors
-[API] This typically indicates:
-[API]   1. Invalid or expired authentication tokens (401/403)
-[API]   2. Account data not found on this endpoint (404)
-[API]   3. Riot API is temporarily unavailable (5xx)
-`;
-    console.log(errorDetails);
     throw new APIError(
         'Failed to fetch account data from all available shards',
         500,
@@ -305,12 +250,10 @@ export const fetchStorefront = async (region: string, puuid: string, forceRefres
         setCachedApiData(storefrontCache, cacheKey, payload);
         return payload;
     } catch (error: any) {
-        console.log('[Store] Caught error in fetchStorefront:', error.message, error.statusCode, error.errorCode);
-        
+
         if (error instanceof APIError) {
             // Handle 404 - account not eligible for store
             if (error.statusCode === 404 || error.errorCode === 'RESOURCE_NOT_FOUND') {
-                console.log('[Store] Account not eligible for store access (404)');
                 const payload: StorefrontAvailabilityResponse = {
                     data: null,
                     isAvailable: false,
@@ -329,13 +272,11 @@ export const fetchStorefront = async (region: string, puuid: string, forceRefres
             }
             // Handle other errors - re-throw
             else {
-                console.log('[Store] Throwing APIError:', error.message);
                 throw error;
             }
         }
         
         // Handle non-APIError exceptions
-        console.log('[Store] Throwing non-APIError:', error.message);
         throw error;
     }
 };
@@ -376,7 +317,6 @@ export const fetchInventory = async (region: string, puuid: string, forceRefresh
                 setCachedApiData(inventoryCache, cacheKey, normalizedOwnedItems);
                 return normalizedOwnedItems;
             }
-            console.log('[Inventory] Unexpected owned-items response shape; trying legacy endpoint');
         } catch (ownedItemsError: any) {
             if (
                 ownedItemsError?.statusCode === 401 ||
@@ -385,7 +325,6 @@ export const fetchInventory = async (region: string, puuid: string, forceRefresh
             ) {
                 throw ownedItemsError;
             }
-            console.log('[Inventory] Owned-items endpoint failed, trying legacy skin_level endpoint');
         }
 
         const legacyResponse = await fetchWithShardFallback(puuid, `/store/v1/entitlements/${puuid}/skin_level`);
@@ -394,12 +333,10 @@ export const fetchInventory = async (region: string, puuid: string, forceRefresh
         setCachedApiData(inventoryCache, cacheKey, payload);
         return payload;
     } catch (error: any) {
-        console.log('[Inventory] Error:', error.message, error.statusCode, error.errorCode);
-        
+
         if (error instanceof APIError) {
             // 404 means no inventory (new account), return empty
             if (error.statusCode === 404 || error.errorCode === 'RESOURCE_NOT_FOUND') {
-                console.log('[Inventory] Account data not found - account may not have any skins');
                 const payload = { Entitlements: [] };
                 setCachedApiData(inventoryCache, cacheKey, payload);
                 return payload; // Return proper structure
@@ -415,7 +352,6 @@ export const fetchInventory = async (region: string, puuid: string, forceRefresh
         }
         
         // Any other error - return empty inventory to be safe
-        console.log('[Inventory] Returning empty inventory due to error');
         const payload = { Entitlements: [] };
         setCachedApiData(inventoryCache, cacheKey, payload);
         return payload;
@@ -458,7 +394,6 @@ export const fetchPlayerMMR = async (region: string, puuid: string) => {
     } catch (error: any) {
         if (error instanceof APIError) {
             if (error.errorCode === 'RESOURCE_NOT_FOUND') {
-                console.log('[MMR] Account not ranked - likely needs placement matches');
                 return null; // Account not ranked
             } else if (error.statusCode === 401 || error.statusCode === 403) {
                 throw {
@@ -475,16 +410,13 @@ export const fetchPlayerMMR = async (region: string, puuid: string) => {
 // NEW: Fetch competitive history for peak rank info
 export const fetchCompetitiveHistory = async (region: string, puuid: string) => {
     try {
-        console.log('[CompetitiveHistory] Fetching competitive history for peak rank');
         const history = await fetchWithShardFallback(
             puuid,
             `/competitiveupdates/v1/player/${puuid}`
         );
-        console.log('[CompetitiveHistory] Successfully fetched history');
         return history;
     } catch (error: any) {
         // No history available - account is unranked or new
-        console.log('[CompetitiveHistory] No history found:', error.message);
         return null;
     }
 };
@@ -498,7 +430,6 @@ export const fetchMatchHistory = async (region: string, puuid: string, forceRefr
     }
 
     try {
-        console.log('[MatchHistory] Fetching match history for', puuid.substring(0, 8));
         const payload = await fetchWithShardFallback(
             puuid,
             `/match-history/v1/history/${puuid}?begin=0&end=20`
@@ -515,7 +446,6 @@ export const fetchMatchHistory = async (region: string, puuid: string, forceRefr
             }
         }
         // Return empty history on any error
-        console.log('[MatchHistory] Failed to fetch:', error.message);
         const payload = { History: [] };
         setCachedApiData(matchHistoryCache, cacheKey, payload);
         return payload;
@@ -643,7 +573,6 @@ export const getPeakRankFromHistory = (history: any): { tier: number; name: stri
 // NEW: Fetch specific match details
 export const fetchMatchDetails = async (region: string, puuid: string, matchId: string) => {
     try {
-        console.log('[MatchDetails] Fetching match details for', matchId);
         return await fetchWithShardFallback(
             puuid,
             `/match-details/v1/matches/${matchId}`
@@ -657,7 +586,6 @@ export const fetchMatchDetails = async (region: string, puuid: string, matchId: 
                 };
             }
         }
-        console.log('[MatchDetails] Failed to fetch:', error.message);
         return null;
     }
 };

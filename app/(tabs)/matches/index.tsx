@@ -239,7 +239,6 @@ const MatchesPage = () => {
                 trackEvent('matches_load_success', { total: 0 });
             }
         } catch (err: any) {
-            console.error('Match History Load Error:', err);
             const normalizedError = normalizeAppError(err, 'Failed to load match history.');
             setIsAuthError(normalizedError.isAuthError);
             setError(normalizedError.message);

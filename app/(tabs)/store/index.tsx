@@ -20,7 +20,6 @@ const StorePage = () => {
     const [error, setError] = useState<string | null>(null);
     const [isAuthError, setIsAuthError] = useState(false);
     const [storeUnavailable, setStoreUnavailable] = useState<{ reason: string; message: string } | null>(null);
-    const [debugInfo, setDebugInfo] = useState<string | null>(null);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
     const [wallet, setWallet] = useState<{ vp: number; radianite: number } | null>(null);
 
@@ -29,15 +28,11 @@ const StorePage = () => {
             setError(null);
             setIsAuthError(false);
             setStoreUnavailable(null);
-            setDebugInfo(null);
             setLoading(true);
             const { info, region } = await getPlayerData();
             
             if (!info) {
                 setGuest(true);
-                if (__DEV__) {
-                    setDebugInfo('debug: guest mode (missing player info/token)');
-                }
                 return;
             }
 
@@ -59,9 +54,6 @@ const StorePage = () => {
                     reason: storefrontResponse.reason || 'UNKNOWN',
                     message: storefrontResponse.message || 'Store data is not available for your account.'
                 });
-                if (__DEV__) {
-                    setDebugInfo(`debug: store unavailable (reason=${storefrontResponse.reason || 'UNKNOWN'})`);
-                }
                 trackEvent('store_load_success', { isAvailable: false, reason: storefrontResponse.reason || 'UNKNOWN' });
                 setLastUpdated(new Date());
                 return;
@@ -101,9 +93,6 @@ const StorePage = () => {
                 setOffers(mappedOffers);
                 setLastUpdated(new Date());
                 trackEvent('store_load_success', { isAvailable: true, dailyOffers: mappedOffers.length });
-                if (__DEV__) {
-                    setDebugInfo(`debug: store ok (dailyOffers=${mappedOffers.length})`);
-                }
                 
                 if (storefront.BonusStore) {
                     const mappedBonus = storefront.BonusStore.BonusStoreOffers.map((offer: any) => {
@@ -129,35 +118,14 @@ const StorePage = () => {
                         dailyOffers: mappedOffers.length,
                         nightMarket: mappedBonus.length,
                     });
-                    if (__DEV__) {
-                        setDebugInfo(`debug: store ok (dailyOffers=${mappedOffers.length}, nightMarket=${mappedBonus.length})`);
-                    }
                 }
             } else {
                 setError('No storefront data found.');
-                if (__DEV__) {
-                    setDebugInfo('debug: missing storefront or mapping data');
-                }
             }
         } catch (err: any) {
-            console.error('Store Load Error:', err);
-            console.error('Error details:', {
-                message: err.message,
-                statusCode: err.statusCode,
-                errorCode: err.errorCode,
-                isAuthError: err.isAuthError,
-                name: err.name
-            });
-            
             const normalizedError = normalizeAppError(err, 'Failed to connect to Riot servers.');
             setIsAuthError(normalizedError.isAuthError);
             trackEvent('store_load_failed', { source: normalizedError.source, message: normalizedError.message });
-
-            if (__DEV__) {
-                const source = normalizedError.source;
-                const message = String(err?.message || 'unknown').slice(0, 140);
-                setDebugInfo(`debug: source=${source} message=${message}`);
-            }
 
             // Handle APIError exceptions
             if (err.name === 'APIError') {
@@ -229,11 +197,6 @@ const StorePage = () => {
     if (guest) {
         return (
             <View style={styles.guestContainer}>
-                {__DEV__ && debugInfo ? (
-                    <View style={styles.debugBanner}>
-                        <Text style={styles.debugText}>{debugInfo}</Text>
-                    </View>
-                ) : null}
                 <Text style={styles.guestText}>Please sign in with Riot to see your live store.</Text>
             </View>
         );
@@ -242,11 +205,6 @@ const StorePage = () => {
     if (error) {
         return (
             <View style={styles.guestContainer}>
-                {__DEV__ && debugInfo ? (
-                    <View style={styles.debugBanner}>
-                        <Text style={styles.debugText}>{debugInfo}</Text>
-                    </View>
-                ) : null}
                 <Text style={styles.errorTitle}>ACCESS DENIED</Text>
                 <Text style={styles.errorText}>{error}</Text>
                 {isAuthError ? (
@@ -264,11 +222,6 @@ const StorePage = () => {
     if (storeUnavailable) {
         return (
             <View style={styles.guestContainer}>
-                {__DEV__ && debugInfo ? (
-                    <View style={styles.debugBanner}>
-                        <Text style={styles.debugText}>{debugInfo}</Text>
-                    </View>
-                ) : null}
                 <Text style={styles.unavailableTitle}>STORE LOCKED</Text>
                 <Text style={styles.unavailableMessage}>{storeUnavailable.message}</Text>
                 <Pressable style={styles.retryButton} onPress={onRefresh}>
@@ -283,11 +236,6 @@ const StorePage = () => {
             style={styles.container}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.dark.tint} />}
         >
-            {__DEV__ && debugInfo ? (
-                <View style={styles.debugBanner}>
-                    <Text style={styles.debugText}>{debugInfo}</Text>
-                </View>
-            ) : null}
             {wallet ? (
                 <View style={styles.walletRow}>
                     <View style={styles.walletPill}>
@@ -394,19 +342,6 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         opacity: 0.5,
         marginBottom: 30,
-    },
-    debugBanner: {
-        backgroundColor: '#22303D',
-        borderColor: '#3D5163',
-        borderWidth: 1,
-        borderRadius: 6,
-        paddingHorizontal: 10,
-        paddingVertical: 8,
-        marginBottom: 12,
-    },
-    debugText: {
-        color: '#9FC4E0',
-        fontSize: 11,
     },
     retryButton: {
         paddingHorizontal: 24,
