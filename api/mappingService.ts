@@ -13,7 +13,6 @@ export const getClientVersion = async () => {
         const response = await fetch(`${BASE_URL}/version`);
         const json = await response.json();
         cachedVersion = json.data.riotClientVersion;
-        console.log('Mapping: Current Riot Client Version:', cachedVersion);
         return cachedVersion;
     } catch (e) {
         return 'release-08.05-shipping-12-2415132'; // Fallback

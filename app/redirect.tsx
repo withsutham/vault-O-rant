@@ -14,7 +14,6 @@ const RedirectHandler = () => {
         if (params.access_token) {
             // Send the token back to the login screen via window postMessage
             // This is handled by the login.tsx WebView integration
-            console.log('[Redirect] Deep link received with access token');
             // The main app navigation will handle routing based on auth state
         }
     }, [params]);

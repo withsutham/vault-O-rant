@@ -62,7 +62,6 @@ const MatchDetailScreen = () => {
 
                 setMatchDetails(details);
             } catch (err: any) {
-                console.error('Error loading match details:', err);
                 setError(err.message || 'Failed to load match details');
             } finally {
                 setLoading(false);

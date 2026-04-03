@@ -2,6 +2,8 @@
 
 Mobile companion app for checking VALORANT profile, rank, match history, store offers, and owned inventory in one place.
 
+This app runs on Expo and follows the React Native + Expo Router fundamentals practiced in `fundamental/`.
+
 ## Features
 
 - Riot sign-in flow with secure token storage
@@ -16,6 +18,17 @@ Mobile companion app for checking VALORANT profile, rank, match history, store o
 - TypeScript
 - Riot auth + PD endpoints
 - Valorant public content mappings (`valorant-api.com`)
+
+## Fundamental Concepts Applied
+
+Based on `fundamental/` materials and examples:
+
+- Mobile app basics and RN foundations (`1. intro_mobileapp.pdf`, `2. RNFundamental.pdf`)
+- Basic RN UI/design patterns (`3. RN_BasicDesign.pdf`)
+- Touch handling and interaction patterns (`4. handlingTouches.pdf`)
+- Firebase concept coverage (`5. Firebase.pdf`)
+- List rendering with `FlatList` (`fundamental/index.js`)
+- Navigation structure with Expo Router `Stack` + `Tabs` layouts (`fundamental/app/_layout.tsx`, `fundamental/app/(tabs)/_layout.tsx`)
 
 ## Getting Started
 
@@ -43,6 +56,7 @@ npm run start
 - `api/` - Riot API service + data mapping services
 - `constants/` - color/theme and RSO config
 - `utils/` - secure storage, analytics stubs, error helpers
+- `fundamental/` - learning sandbox and lesson references used as the project foundation
 
 ## Notes
 
